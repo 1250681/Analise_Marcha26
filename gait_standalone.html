@@ -767,15 +767,14 @@ function draw(result) {
   };
   drawSegment(hipPx, lineEndPx, '#ffd23d', 3);
 
-  // Linha pélvica de referência (horizontal, fina, tracejada, amarela)
-  // — passa pela altura do midpoint das ancas, ao longo de toda a largura do ecrã.
-  // Útil para avaliar obliquidade pélvica (uma anca mais alta que a outra).
+  // Linha pélvica de referência (vertical, fina, tracejada, amarela)
+  // — passa pelo midpoint das ancas (linha medial), do topo ao fundo do ecrã.
   ctx.setLineDash([6, 5]);
   ctx.lineWidth   = 1.5;
   ctx.strokeStyle = 'rgba(255,210,61,0.55)';
   ctx.beginPath();
-  ctx.moveTo(0, hipPx.y);
-  ctx.lineTo(canvas.width, hipPx.y);
+  ctx.moveTo(hipPx.x, 0);
+  ctx.lineTo(hipPx.x, canvas.height);
   ctx.stroke();
 
   // Linhas verticais de referência (finas, tracejadas, amarelas) — uma a passar
