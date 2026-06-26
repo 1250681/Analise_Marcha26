@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GaitAnalysis · Standalone</title>
+<style>
+:root {
+  --bg:       #0b1014;
+  --panel:    #11181d;
+  --line:     #23303a;
+  --accent:   #3ddc97;
+  --acc-dim:  #2a9d6f;
+  --blue:     #3b82f6;
+  --red:      #ef4444;
+  --warn:     #e8a33d;
+  --text:     #e7eef0;
+  --text-dim: #7f9098;
+  --mono:     'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, system-ui, sans-serif;
+  height: 100%;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ── REGISTO ── */
+#page-reg {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+  z-index: 50;
+}
+.reg-title {
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+  text-align: center;
+}
+.reg-title span { color: var(--accent); }
+.reg-sub {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 36px;
+  text-align: center;
+  line-height: 1.5;
+}
+.reg-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 420px;
+}
+.reg-field { margin-bottom: 18px; }
+.reg-field label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 7px;
+}
+.reg-field input {
+  width: 100%;
+  height: 48px;
+  background: var(--bg);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.reg-field input:focus { border-color: var(--accent); }
+.reg-btn {
+  width: 100%;
+  height: 52px;
+  background: var(--accent);
+  color: #06140e;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: background 0.2s;
+}
+.reg-btn:active { background: var(--acc-dim); }
+
+/* ── SESSÃO ── */
+#page-session {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: none;
+}
+
+video, canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#overlay { pointer-events: none; }
+
+/* TOP BAR */
+#topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding-top: max(env(safe-area-inset-top, 0px), 14px);
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: linear-gradient(180deg, rgba(11,16,20,0.9) 0%, transparent 100%);
+  z-index: 10;
+}
+.top-left { display: flex; flex-direction: column; gap: 3px; }
+.top-app {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  display: inline-block;
+  flex-shrink: 0;
+}
+#status-dot.live { background: var(--accent); box-shadow: 0 0 7px var(--accent); }
+.top-pac {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+#fps-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* CONTROLS */
+#ctrl-left, #ctrl-right {
+  position: absolute;
+  top: 80px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#ctrl-left  { left: 12px; }
+#ctrl-right { right: 12px; }
+
+.cbtn {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: rgba(17,24,29,0.85);
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 9px 13px;
+  border-radius: 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 108px;
+  text-align: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.cbtn:active { background: var(--line); }
+.cbtn:disabled { opacity: 0.35; pointer-events: none; }
+.cbtn.c-green { border-color: var(--accent); color: var(--accent); }
+.cbtn.c-red   { border-color: var(--red);   color: var(--red); }
+.cbtn.c-blue  { border-color: var(--blue);  color: var(--blue); }
+.cbtn.c-warn  { border-color: var(--warn);  color: var(--warn); }
+
+/* MODE HINT */
+#mode-hint {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  background: rgba(232,163,61,0.96);
+  color: #1a0e00;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 78vw;
+  display: none;
+  line-height: 1.4;
+}
+#mode-hint.show { display: block; }
+
+/* SNAP FLASH */
+#snap-flash {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  background: rgba(61,220,151,0.96);
+  color: #06140e;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  padding: 14px 30px;
+  border-radius: 12px;
+  display: none;
+}
+#snap-flash.show { display: block; }
+
+/* BOTTOM READOUT */
+#readout {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 10;
+  padding: 14px 12px;
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 18px);
+  background: linear-gradient(0deg, rgba(11,16,20,0.97) 0%, rgba(11,16,20,0.55) 80%, transparent 100%);
+}
+
+/* Angle */
+.angle-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+}
+#angle-val {
+  font-family: var(--mono);
+  font-size: 58px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+  transition: color 0.25s;
+}
+.angle-unit {
+  font-family: var(--mono);
+  font-size: 22px;
+  color: var(--text-dim);
+}
+#angle-lbl {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-top: 2px;
+  margin-bottom: 11px;
+}
+
+/* Segments */
+#seg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.seg-col {
+  background: rgba(17,24,29,0.7);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 11px;
+  backdrop-filter: blur(4px);
+}
+.seg-col-ttl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 7px;
+}
+.seg-col-ttl.esq { color: var(--blue); }
+.seg-col-ttl.dir { color: var(--red); }
+.seg-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(35,48,58,0.6);
+}
+.seg-row:last-child { border-bottom: none; }
+.seg-lbl { font-size: 9px; color: var(--text-dim); }
+.seg-val { font-family: var(--mono); font-size: 12px; font-weight: 500; }
+.seg-val.esq { color: var(--blue); }
+.seg-val.dir { color: var(--red); }
+.seg-val.bold { font-weight: 700; }
+
+/* Status */
+#status-bar {
+  display: flex;
+  justify-content: center;
+}
+#status-msg {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  background: rgba(17,24,29,0.7);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 12px;
+}
+
+/* LOADING / ERROR */
+#loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--bg);
+  z-index: 20;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 24px;
+}
+.spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#error-box {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 25;
+  padding: 28px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+#error-box.show { display: flex; }
+#error-box strong { color: var(--warn); display: block; margin-bottom: 10px; font-size: 16px; }
+
+/* SUMMARY MODAL */
+#summary {
+  position: fixed;
+  inset: 0;
+  background: rgba(11,16,20,0.97);
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  padding: 24px 14px;
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#summary.show { display: flex; }
+.sum-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.sum-pac {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 18px;
+}
+.sum-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: var(--mono);
+  margin-bottom: 20px;
+}
+.sum-table-wrap { overflow-x: auto; margin-bottom: 18px; -webkit-overflow-scrolling: touch; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 10px;
+  min-width: 520px;
+}
+th {
+  background: var(--panel);
+  color: var(--text-dim);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+td {
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  white-space: nowrap;
+}
+tr:nth-child(even) td { background: var(--panel); }
+.sum-btns { display: flex; gap: 10px; margin-top: 4px; }
+.sum-btns button {
+  flex: 1;
+  height: 48px;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.btn-copy  { background: var(--accent); color: #06140e; }
+.btn-close { background: var(--panel); color: var(--text); border: 1px solid var(--line) !important; }
+</style>
+</head>
+<body>
+
+<!-- ── REGISTO ── -->
+<div id="page-reg">
+  <div class="reg-title">Gait<span>Analysis</span></div>
+  <div class="reg-sub">Análise de Marcha · Standalone<br>MediaPipe Pose Estimation</div>
+  <div class="reg-card">
+    <div class="reg-field">
+      <label>Nome do paciente</label>
+      <input type="text" id="reg-nome" placeholder="Nome completo" autocomplete="off"/>
+    </div>
+    <div class="reg-field">
+      <label>Data da avaliação</label>
+      <input type="date" id="reg-data"/>
+    </div>
+    <button class="reg-btn" onclick="comecarSessao()">Avaliação →</button>
+  </div>
+</div>
+
+<!-- ── SESSÃO ── -->
+<div id="page-session">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="overlay"></canvas>
+
+  <div id="topbar">
+    <div class="top-left">
+      <div class="top-app">
+        <span id="status-dot"></span>
+        GaitAnalysis
+      </div>
+      <div class="top-pac" id="top-pac">—</div>
+    </div>
+    <div id="fps-label">-- fps</div>
+  </div>
+
+  <div id="ctrl-left">
+    <button class="cbtn" onclick="flipCamera()">⟲ Câmara</button>
+    <button class="cbtn c-warn" id="btn-calib" onclick="iniciarCalibracao()">📏 Calibrar</button>
+  </div>
+
+  <div id="ctrl-right">
+    <button class="cbtn c-green" id="btn-ini"  onclick="iniciarAvaliacao()">▶ Iniciar</button>
+    <button class="cbtn c-blue"  id="btn-reg"  onclick="registarMedidas()" disabled>📌 Registar</button>
+    <button class="cbtn c-red"   id="btn-term" onclick="terminarAvaliacao()" disabled>■ Terminar</button>
+  </div>
+
+  <div id="mode-hint"></div>
+  <div id="snap-flash">✓ REGISTADO</div>
+
+  <div id="readout">
+    <div class="angle-row">
+      <span id="angle-val">--</span>
+      <span class="angle-unit">°</span>
+    </div>
+    <div id="angle-lbl">desvio do tronco da vertical</div>
+
+    <div id="seg-grid">
+      <div class="seg-col">
+        <div class="seg-col-ttl esq">Esquerdo</div>
+        <div class="seg-row">
+          <span class="seg-lbl">Tornozelo → Joelho</span>
+          <span class="seg-val esq" id="ank-knee-esq">—</span>
+        </div>
+        <div class="seg-row">
+          <span class="seg-lbl">Joelho → Anca</span>
+          <span class="seg-val esq" id="knee-hip-esq">—</span>
+        </div>
+        <div class="seg-row">
+          <span class="seg-lbl">Total</span>
+          <span class="seg-val esq bold" id="total-esq">—</span>
+        </div>
+      </div>
+      <div class="seg-col">
+        <div class="seg-col-ttl dir">Direito</div>
+        <div class="seg-row">
+          <span class="seg-lbl">Tornozelo → Joelho</span>
+          <span class="seg-val dir" id="ank-knee-dir">—</span>
+        </div>
+        <div class="seg-row">
+          <span class="seg-lbl">Joelho → Anca</span>
+          <span class="seg-val dir" id="knee-hip-dir">—</span>
+        </div>
+        <div class="seg-row">
+          <span class="seg-lbl">Total</span>
+          <span class="seg-val dir bold" id="total-dir">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="status-bar">
+      <span id="status-msg">A carregar modelo…</span>
+    </div>
+  </div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <div>A carregar MediaPipe Pose…<br>Pode demorar alguns segundos.</div>
+  </div>
+  <div id="error-box">
+    <div>
+      <strong>Câmara inacessível</strong>
+      Verifica as permissões de câmara no browser.<br>
+      Em iOS, abre via Safari (ficheiro local ou servidor local).
+    </div>
+  </div>
+</div>
+
+<!-- ── RESUMO DA SESSÃO ── -->
+<div id="summary">
+  <div class="sum-title">Relatório da Sessão</div>
+  <div class="sum-pac" id="sum-pac">—</div>
+  <div id="sum-empty-msg" class="sum-empty">Nenhuma medida registada.</div>
+  <div class="sum-table-wrap" id="sum-table-wrap" style="display:none">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Hora</th>
+          <th>Tronco °</th>
+          <th>Ank→Jo E</th>
+          <th>Jo→An E</th>
+          <th>Tot E</th>
+          <th>Ank→Jo D</th>
+          <th>Jo→An D</th>
+          <th>Tot D</th>
+        </tr>
+      </thead>
+      <tbody id="sum-body"></tbody>
+    </table>
+  </div>
+  <div class="sum-btns">
+    <button class="btn-copy"  onclick="copiarResumo()">📋 Copiar</button>
+    <button class="btn-close" onclick="fecharResumo()">✕ Fechar</button>
+  </div>
+</div>
+
+<script type="module">
+import { PoseLandmarker, FilesetResolver, DrawingUtils }
+  from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+// ── Estado ──
+let poseLandmarker = null;
+let drawingUtils   = null;
+let lastVideoTime  = -1;
+let facingMode     = 'environment';  // câmara traseira por defeito (plano sagital)
+let isMirrored     = false;
+let scaleFactor    = null;           // cm por pixel de canvas
+let calibMode      = false;
+let calibPts       = [];
+let sessaoAtiva    = false;
+let snapshots      = [];
+let pacNome        = '';
+let pacData        = '';
+let currentM       = {};             // métricas do frame atual
+
+// FPS
+let lastFpsTime = performance.now();
+let frmCount    = 0;
+
+// Suavização (média móvel)
+const SMOOTH_N  = 5;
+const angBuf    = [];
+function smooth(v) {
+  angBuf.push(v);
+  if (angBuf.length > SMOOTH_N) angBuf.shift();
+  return angBuf.reduce((a,b) => a+b, 0) / angBuf.length;
+}
+
+// ── DOM ──
+const video      = document.getElementById('video');
+const canvas     = document.getElementById('overlay');
+const ctx        = canvas.getContext('2d');
+const angleValEl = document.getElementById('angle-val');
+const angleLblEl = document.getElementById('angle-lbl');
+const fpsLbl     = document.getElementById('fps-label');
+const statusDot  = document.getElementById('status-dot');
+const loadingEl  = document.getElementById('loading');
+const errorBox   = document.getElementById('error-box');
+const modeHint   = document.getElementById('mode-hint');
+const snapFlash  = document.getElementById('snap-flash');
+const statusMsg  = document.getElementById('status-msg');
+
+// ── Registo de paciente ──
+window.comecarSessao = function() {
+  const nome = document.getElementById('reg-nome').value.trim();
+  const data  = document.getElementById('reg-data').value;
+  if (!nome || !data) { alert('Preenche o nome e a data.'); return; }
+  pacNome = nome;
+  pacData = data;
+  document.getElementById('top-pac').textContent = `${nome} · ${data}`;
+  document.getElementById('page-reg').style.display    = 'none';
+  document.getElementById('page-session').style.display = 'block';
+  setup();
+};
+
+// ── Configuração MediaPipe ──
+async function setup() {
+  try {
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+    poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+        delegate: "GPU"
+      },
+      runningMode: "VIDEO",
+      numPoses: 1
+    });
+    drawingUtils = new DrawingUtils(ctx);
+    await startCamera();
+    loadingEl.style.display = 'none';
+    statusDot.classList.add('live');
+    statusMsg.textContent = 'A detetar postura…';
+    requestAnimationFrame(predictLoop);
+  } catch (err) {
+    console.error(err);
+    loadingEl.style.display = 'none';
+    errorBox.classList.add('show');
+  }
+}
+
+// ── Câmara ──
+async function startCamera() {
+  if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false
+  });
+  video.srcObject = stream;
+  isMirrored = (facingMode === 'user');
+  const m = isMirrored ? 'scaleX(-1)' : 'none';
+  video.style.transform  = m;
+  canvas.style.transform = m;
+  return new Promise(resolve => {
+    video.onloadedmetadata = () => {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      // Reset calibração ao trocar câmara
+      calibPts    = [];
+      scaleFactor = null;
+      document.getElementById('btn-calib').textContent = '📏 Calibrar';
+      resolve();
+    };
+  });
+}
+
+window.flipCamera = async function() {
+  facingMode = (facingMode === 'user') ? 'environment' : 'user';
+  await startCamera();
+};
+
+// ── Loop de deteção ──
+function predictLoop() {
+  if (video.currentTime !== lastVideoTime && video.readyState >= 2) {
+    lastVideoTime = video.currentTime;
+    const result = poseLandmarker.detectForVideo(video, performance.now());
+    draw(result);
+  }
+  frmCount++;
+  const now = performance.now();
+  if (now - lastFpsTime > 1000) {
+    fpsLbl.textContent = frmCount + ' fps';
+    frmCount    = 0;
+    lastFpsTime = now;
+  }
+  requestAnimationFrame(predictLoop);
+}
+
+// ── Distância entre dois landmarks em pixels de canvas ──
+function segPx(a, b) {
+  const dx = (a.x - b.x) * canvas.width;
+  const dy = (a.y - b.y) * canvas.height;
+  return Math.hypot(dx, dy);
+}
+
+function toCm(px) {
+  if (!scaleFactor) return null;
+  return (px * scaleFactor).toFixed(1);
+}
+
+// ── Desenho e cálculo ──
+function draw(result) {
+  ctx.save();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Pontos de calibração (sempre visíveis)
+  drawCalibPoints();
+
+  if (!result.landmarks || result.landmarks.length === 0) {
+    angleLblEl.textContent = 'sem deteção — ajusta o enquadramento';
+    clearSegs();
+    ctx.restore();
+    return;
+  }
+
+  const lm = result.landmarks[0];
+
+  // Esqueleto completo (tons suaves)
+  drawingUtils.drawLandmarks(lm, { radius: 3, color: '#3ddc97', fillColor: '#3ddc97' });
+  drawingUtils.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {
+    color: 'rgba(61,220,151,0.35)', lineWidth: 2
+  });
+
+  const toPx = p => ({ x: p.x * canvas.width, y: p.y * canvas.height });
+
+  // Destaque dos segmentos dos membros inferiores
+  // Esquerdo (azul): 23=anca_E, 25=joelho_E, 27=tornozelo_E
+  drawSegment(toPx(lm[23]), toPx(lm[25]), 'rgba(59,130,246,0.75)', 2.5);
+  drawSegment(toPx(lm[25]), toPx(lm[27]), 'rgba(59,130,246,0.75)', 2.5);
+  // Direito (vermelho): 24=anca_D, 26=joelho_D, 28=tornozelo_D
+  drawSegment(toPx(lm[24]), toPx(lm[26]), 'rgba(239,68,68,0.75)', 2.5);
+  drawSegment(toPx(lm[26]), toPx(lm[28]), 'rgba(239,68,68,0.75)', 2.5);
+
+  // Tronco (amarelo): midpoint ombros → midpoint ancas
+  const sh  = { x: (lm[11].x + lm[12].x) / 2, y: (lm[11].y + lm[12].y) / 2 };
+  const hip = { x: (lm[23].x + lm[24].x) / 2, y: (lm[23].y + lm[24].y) / 2 };
+  const shPx  = toPx(sh);
+  const hipPx = toPx(hip);
+  drawSegment(shPx, hipPx, '#ffd23d', 3);
+  [shPx, hipPx].forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ffd23d';
+    ctx.fill();
+  });
+
+  // Linha vertical de referência no midpoint das ancas
+  ctx.setLineDash([6, 5]);
+  ctx.lineWidth   = 1.5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath();
+  ctx.moveTo(hipPx.x, hipPx.y - canvas.height * 0.4);
+  ctx.lineTo(hipPx.x, hipPx.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Ângulo do tronco em relação à vertical
+  // Vetor tronco: anca → ombro. Em coords de imagem (y para baixo), upward = (0, -1).
+  const tx = sh.x - hip.x;
+  const ty = sh.y - hip.y;  // negativo (ombros acima das ancas)
+  // atan2(deslocamento horizontal, magnitude vertical) → desvio da vertical
+  const rawAngle = Math.abs(Math.atan2(Math.abs(tx), Math.abs(ty)) * (180 / Math.PI));
+  const angle    = smooth(rawAngle);
+
+  // Calcular distâncias segmentares
+  const akE_px = segPx(lm[27], lm[25]);  // tornozelo E → joelho E
+  const khE_px = segPx(lm[25], lm[23]);  // joelho E → anca E
+  const totE_px = akE_px + khE_px;
+  const akD_px = segPx(lm[28], lm[26]);  // tornozelo D → joelho D
+  const khD_px = segPx(lm[26], lm[24]);  // joelho D → anca D
+  const totD_px = akD_px + khD_px;
+
+  // UI — ângulo
+  angleValEl.textContent = angle.toFixed(1);
+  angleValEl.style.color =
+    angle < 5  ? '#3ddc97' :
+    angle < 15 ? '#e8a33d' : '#ef4444';
+  angleLblEl.textContent = scaleFactor
+    ? `desvio do tronco da vertical`
+    : `desvio do tronco da vertical  ·  calibra para medidas em cm`;
+
+  // UI — segmentos
+  setSegs({
+    akE: toCm(akE_px), khE: toCm(khE_px), totE: toCm(totE_px),
+    akD: toCm(akD_px), khD: toCm(khD_px), totD: toCm(totD_px),
+  });
+
+  // Guardar métricas correntes para snapshot
+  currentM = {
+    angulo_tronco: angle.toFixed(1),
+    ank_knee_esq:  toCm(akE_px)  ?? '—',
+    knee_hip_esq:  toCm(khE_px)  ?? '—',
+    total_esq:     toCm(totE_px) ?? '—',
+    ank_knee_dir:  toCm(akD_px)  ?? '—',
+    knee_hip_dir:  toCm(khD_px)  ?? '—',
+    total_dir:     toCm(totD_px) ?? '—',
+  };
+
+  ctx.restore();
+}
+
+function drawSegment(a, b, color, width) {
+  ctx.lineWidth   = width;
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+}
+
+function drawCalibPoints() {
+  calibPts.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 9, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(232,163,61,0.85)';
+    ctx.fill();
+    ctx.fillStyle = '#1a0e00';
+    ctx.font      = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(i + 1, p.x, p.y);
+  });
+  if (calibPts.length === 2) {
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth   = 1.5;
+    ctx.strokeStyle = 'rgba(232,163,61,0.6)';
+    ctx.beginPath();
+    ctx.moveTo(calibPts[0].x, calibPts[0].y);
+    ctx.lineTo(calibPts[1].x, calibPts[1].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function setSegs(d) {
+  const fmt = v => v ? v + ' cm' : '—';
+  document.getElementById('ank-knee-esq').textContent = fmt(d.akE);
+  document.getElementById('knee-hip-esq').textContent = fmt(d.khE);
+  document.getElementById('total-esq').textContent    = fmt(d.totE);
+  document.getElementById('ank-knee-dir').textContent = fmt(d.akD);
+  document.getElementById('knee-hip-dir').textContent = fmt(d.khD);
+  document.getElementById('total-dir').textContent    = fmt(d.totD);
+}
+
+function clearSegs() {
+  ['ank-knee-esq','knee-hip-esq','total-esq','ank-knee-dir','knee-hip-dir','total-dir']
+    .forEach(id => { document.getElementById(id).textContent = '—'; });
+}
+
+// ── Calibração ──
+window.iniciarCalibracao = function() {
+  calibMode = true;
+  calibPts  = [];
+  scaleFactor = null;
+  canvas.style.pointerEvents = 'auto';
+  modeHint.textContent = '📏 Toca em 2 pontos que distam 30 cm\n(ex: marcas no chão ou régua visível)';
+  modeHint.classList.add('show');
+  statusMsg.textContent = 'Calibração ativa — toca no 1.º ponto';
+  document.getElementById('btn-calib').textContent = '✕ Cancelar calib.';
+  document.getElementById('btn-calib').onclick = cancelarCalibracao;
+};
+
+function cancelarCalibracao() {
+  calibMode = false;
+  calibPts  = [];
+  canvas.style.pointerEvents = 'none';
+  modeHint.classList.remove('show');
+  statusMsg.textContent = 'Calibração cancelada';
+  const btn = document.getElementById('btn-calib');
+  btn.textContent = '📏 Calibrar';
+  btn.onclick = iniciarCalibracao;
+}
+window.iniciarCalibracao = iniciarCalibracao;
+
+function canvasPoint(e) {
+  const rect = canvas.getBoundingClientRect();
+  let cx, cy;
+  if (e.touches && e.touches.length > 0) {
+    cx = e.touches[0].clientX;
+    cy = e.touches[0].clientY;
+  } else {
+    cx = e.clientX;
+    cy = e.clientY;
+  }
+  // Converter posição CSS → pixels de canvas
+  const sx = canvas.width  / rect.width;
+  const sy = canvas.height / rect.height;
+  let x = (cx - rect.left) * sx;
+  const y = (cy - rect.top) * sy;
+  // Se a câmara está espelhada via CSS, o clique está no espaço espelhado
+  // mas a distância de calibração é simétrica — não é necessário ajustar
+  return { x, y };
+}
+
+function handleCalib(e) {
+  if (!calibMode) return;
+  e.preventDefault();
+  const pt = canvasPoint(e);
+  calibPts.push(pt);
+
+  if (calibPts.length === 1) {
+    modeHint.textContent = '📏 Agora toca no 2.º ponto (a 30 cm do primeiro)';
+    statusMsg.textContent = 'Calibração — toca no 2.º ponto';
+  } else if (calibPts.length === 2) {
+    const dx = calibPts[1].x - calibPts[0].x;
+    const dy = calibPts[1].y - calibPts[0].y;
+    const distPx = Math.hypot(dx, dy);
+    if (distPx < 20) {
+      // Pontos muito próximos — ignorar
+      calibPts.pop();
+      modeHint.textContent = '⚠ Pontos demasiado próximos. Tenta de novo.';
+      return;
+    }
+    scaleFactor = 30 / distPx;
+    calibMode   = false;
+    canvas.style.pointerEvents = 'none';
+    modeHint.textContent = `✅ Calibrado: ${(1/scaleFactor).toFixed(1)} px/cm`;
+    setTimeout(() => modeHint.classList.remove('show'), 2500);
+    statusMsg.textContent = `Escala: ${scaleFactor.toFixed(4)} cm/px`;
+    const btn = document.getElementById('btn-calib');
+    btn.textContent = '📏 Recalibrar';
+    btn.onclick = iniciarCalibracao;
+  }
+}
+
+canvas.addEventListener('click',      handleCalib);
+canvas.addEventListener('touchstart', handleCalib, { passive: false });
+
+// ── Controlo da sessão ──
+window.iniciarAvaliacao = function() {
+  sessaoAtiva = true;
+  snapshots   = [];
+  document.getElementById('btn-ini').disabled  = true;
+  document.getElementById('btn-reg').disabled  = false;
+  document.getElementById('btn-term').disabled = false;
+  statusMsg.textContent = '▶ Avaliação em curso…';
+};
+
+window.registarMedidas = function() {
+  if (!sessaoAtiva) return;
+  const ts = new Date().toLocaleTimeString('pt-PT', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  snapshots.push({ ts, ...currentM });
+  snapFlash.classList.add('show');
+  setTimeout(() => snapFlash.classList.remove('show'), 1200);
+};
+
+window.terminarAvaliacao = function() {
+  sessaoAtiva = false;
+  document.getElementById('btn-ini').disabled  = false;
+  document.getElementById('btn-reg').disabled  = true;
+  document.getElementById('btn-term').disabled = true;
+  statusMsg.textContent = '■ Avaliação terminada';
+  mostrarResumo();
+};
+
+// ── Modal de resumo ──
+function mostrarResumo() {
+  document.getElementById('sum-pac').textContent = `${pacNome} · ${pacData}`;
+  const tbody = document.getElementById('sum-body');
+  tbody.innerHTML = '';
+  const wrap  = document.getElementById('sum-table-wrap');
+  const empty = document.getElementById('sum-empty-msg');
+
+  if (snapshots.length === 0) {
+    empty.style.display = 'flex';
+    wrap.style.display  = 'none';
+  } else {
+    empty.style.display = 'none';
+    wrap.style.display  = 'block';
+    snapshots.forEach((s, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${s.ts}</td>
+        <td>${s.angulo_tronco}°</td>
+        <td>${s.ank_knee_esq}</td>
+        <td>${s.knee_hip_esq}</td>
+        <td>${s.total_esq}</td>
+        <td>${s.ank_knee_dir}</td>
+        <td>${s.knee_hip_dir}</td>
+        <td>${s.total_dir}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('summary').classList.add('show');
+}
+
+window.fecharResumo = function() {
+  document.getElementById('summary').classList.remove('show');
+};
+
+window.copiarResumo = async function() {
+  if (snapshots.length === 0) return;
+  const header = `GaitAnalysis — ${pacNome} · ${pacData}\n` +
+    `Nº  Hora         Tronco°  Ank→Jo E  Jo→An E  Tot E    Ank→Jo D  Jo→An D  Tot D\n` +
+    `${'—'.repeat(75)}\n`;
+  const rows = snapshots.map((s, i) =>
+    `${String(i+1).padEnd(4)}${s.ts.padEnd(13)}${s.angulo_tronco.padEnd(9)}${s.ank_knee_esq.padEnd(10)}${s.knee_hip_esq.padEnd(9)}${s.total_esq.padEnd(9)}${s.ank_knee_dir.padEnd(10)}${s.knee_hip_dir.padEnd(9)}${s.total_dir}`
+  ).join('\n');
+  try {
+    await navigator.clipboard.writeText(header + rows);
+    const btn = document.querySelector('.btn-copy');
+    btn.textContent = '✅ Copiado!';
+    setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000);
+  } catch {
+    alert('Copia o texto manualmente:\n\n' + header + rows);
+  }
+};
+
+// Data de hoje como padrão
+document.getElementById('reg-data').value = new Date().toISOString().split('T')[0];
+</script>
+</body>
+</html>
