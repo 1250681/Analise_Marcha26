@@ -767,11 +767,15 @@ function draw(result) {
   };
   drawSegment(hipPx, lineEndPx, '#ffd23d', 3);
 
-  // Linha pélvica de referência (vertical, fina, tracejada, amarela)
+  // Linha pélvica de referência (vertical, fina, tracejada, vermelha)
   // — passa pelo midpoint das ancas (linha medial), do topo ao fundo do ecrã.
+  // Cor vermelha (em vez de amarela) para não se confundir visualmente com o
+  // tronco sólido amarelo, que parte do mesmo ponto e segue quase a mesma direção
+  // quando a postura está alinhada — com a mesma cor, o tracejado "desaparecia"
+  // dentro do traço sólido nesses casos.
   ctx.setLineDash([6, 5]);
   ctx.lineWidth   = 1.5;
-  ctx.strokeStyle = 'rgba(255,210,61,0.55)';
+  ctx.strokeStyle = 'rgba(239,68,68,0.7)';
   ctx.beginPath();
   ctx.moveTo(hipPx.x, 0);
   ctx.lineTo(hipPx.x, canvas.height);
@@ -779,8 +783,9 @@ function draw(result) {
 
   // Linhas verticais de referência (finas, tracejadas, amarelas) — uma a passar
   // por cada anca (não seguem mais nenhum landmark, são retas puras, tal como a
-  // linha pélvica horizontal acima — servem para ver se joelho/tornozelo/ombro
+  // linha medial acima — servem para ver se joelho/tornozelo/ombro
   // do mesmo lado caem ou não na vertical da respetiva anca).
+  ctx.strokeStyle = 'rgba(255,210,61,0.55)';
   const hipLPx = toPx(lm[23]); // anca esquerda
   const hipRPx = toPx(lm[24]); // anca direita
   [hipLPx, hipRPx].forEach(p => {
