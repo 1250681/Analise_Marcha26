@@ -280,41 +280,15 @@ video, canvas {
 }
 
 /* Segments */
-#seg-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+/* Medição manual (rato/toque) */
+#med-readout {
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--blue);
+  min-height: 18px;
   margin-bottom: 10px;
 }
-.seg-col {
-  background: rgba(17,24,29,0.7);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 9px 11px;
-  backdrop-filter: blur(4px);
-}
-.seg-col-ttl {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 7px;
-}
-.seg-col-ttl.esq { color: var(--blue); }
-.seg-col-ttl.dir { color: var(--red); }
-.seg-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 3px 0;
-  border-bottom: 1px solid rgba(35,48,58,0.6);
-}
-.seg-row:last-child { border-bottom: none; }
-.seg-lbl { font-size: 9px; color: var(--text-dim); }
-.seg-val { font-family: var(--mono); font-size: 12px; font-weight: 500; }
-.seg-val.esq { color: var(--blue); }
-.seg-val.dir { color: var(--red); }
-.seg-val.bold { font-weight: 700; }
 
 /* Status */
 #status-bar {
@@ -398,6 +372,31 @@ video, canvas {
   color: var(--text-dim);
   margin-bottom: 18px;
 }
+.sum-angle-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.sum-angle-stats .stat-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.sum-angle-stats .stat-lbl {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 3px;
+}
+.sum-angle-stats .stat-val {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--warn);
+}
 .sum-empty {
   flex: 1;
   display: flex;
@@ -446,6 +445,7 @@ tr:nth-child(even) td { background: var(--panel); }
   cursor: pointer;
 }
 .btn-copy  { background: var(--accent); color: #06140e; }
+.btn-pdf   { background: linear-gradient(135deg, var(--blue), var(--accent)); color: #06140e; font-weight: 800; }
 .btn-close { background: var(--panel); color: var(--text); border: 1px solid var(--line) !important; }
 </style>
 </head>
@@ -487,6 +487,7 @@ tr:nth-child(even) td { background: var(--panel); }
   <div id="ctrl-left">
     <button class="cbtn" onclick="flipCamera()">⟲ Câmara</button>
     <button class="cbtn c-warn" id="btn-calib" onclick="iniciarCalibracao()">📏 Calibrar</button>
+    <button class="cbtn c-blue" id="btn-medir" onclick="iniciarMedicao()">📐 Medir</button>
   </div>
 
   <div id="ctrl-right">
@@ -505,38 +506,7 @@ tr:nth-child(even) td { background: var(--panel); }
     </div>
     <div id="angle-lbl">desvio do tronco da vertical</div>
 
-    <div id="seg-grid">
-      <div class="seg-col">
-        <div class="seg-col-ttl esq">Esquerdo</div>
-        <div class="seg-row">
-          <span class="seg-lbl">Tornozelo → Joelho</span>
-          <span class="seg-val esq" id="ank-knee-esq">—</span>
-        </div>
-        <div class="seg-row">
-          <span class="seg-lbl">Joelho → Anca</span>
-          <span class="seg-val esq" id="knee-hip-esq">—</span>
-        </div>
-        <div class="seg-row">
-          <span class="seg-lbl">Total</span>
-          <span class="seg-val esq bold" id="total-esq">—</span>
-        </div>
-      </div>
-      <div class="seg-col">
-        <div class="seg-col-ttl dir">Direito</div>
-        <div class="seg-row">
-          <span class="seg-lbl">Tornozelo → Joelho</span>
-          <span class="seg-val dir" id="ank-knee-dir">—</span>
-        </div>
-        <div class="seg-row">
-          <span class="seg-lbl">Joelho → Anca</span>
-          <span class="seg-val dir" id="knee-hip-dir">—</span>
-        </div>
-        <div class="seg-row">
-          <span class="seg-lbl">Total</span>
-          <span class="seg-val dir bold" id="total-dir">—</span>
-        </div>
-      </div>
-    </div>
+    <div id="med-readout"></div>
 
     <div id="status-bar">
       <span id="status-msg">A carregar modelo…</span>
@@ -560,7 +530,8 @@ tr:nth-child(even) td { background: var(--panel); }
 <div id="summary">
   <div class="sum-title">Relatório da Sessão</div>
   <div class="sum-pac" id="sum-pac">—</div>
-  <div id="sum-empty-msg" class="sum-empty">Nenhuma medida registada.</div>
+  <div id="sum-angle-stats" class="sum-angle-stats"></div>
+  <div id="sum-empty-msg" class="sum-empty">Nenhuma medida pontual registada.</div>
   <div class="sum-table-wrap" id="sum-table-wrap" style="display:none">
     <table>
       <thead>
@@ -580,11 +551,13 @@ tr:nth-child(even) td { background: var(--panel); }
     </table>
   </div>
   <div class="sum-btns">
+    <button class="btn-pdf"   onclick="gerarPDF()">📄 Gerar PDF</button>
     <button class="btn-copy"  onclick="copiarResumo()">📋 Copiar</button>
     <button class="btn-close" onclick="fecharResumo()">✕ Fechar</button>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script type="module">
 import { PoseLandmarker, FilesetResolver, DrawingUtils }
   from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
@@ -598,11 +571,17 @@ let isMirrored     = false;
 let scaleFactor    = null;           // cm por pixel de canvas
 let calibMode      = false;
 let calibPts       = [];
+let medMode        = false;          // modo de medição manual (2 pontos → distância)
+let medPts         = [];
+let lastMedDistCm  = null;
 let sessaoAtiva    = false;
 let snapshots      = [];
 let pacNome        = '';
 let pacData        = '';
 let currentM       = {};             // métricas do frame atual
+let angleLog       = [];             // série temporal {t, a} do ângulo durante a avaliação
+let avalStartTime  = 0;
+let lastLogT       = -1;
 
 // FPS
 let lastFpsTime = performance.now();
@@ -630,6 +609,7 @@ const errorBox   = document.getElementById('error-box');
 const modeHint   = document.getElementById('mode-hint');
 const snapFlash  = document.getElementById('snap-flash');
 const statusMsg  = document.getElementById('status-msg');
+const medReadout = document.getElementById('med-readout');
 
 // ── Registo de paciente ──
 window.comecarSessao = function() {
@@ -688,10 +668,14 @@ async function startCamera() {
     video.onloadedmetadata = () => {
       canvas.width  = video.videoWidth;
       canvas.height = video.videoHeight;
-      // Reset calibração ao trocar câmara
-      calibPts    = [];
-      scaleFactor = null;
+      // Reset calibração e medição ao trocar câmara
+      calibPts      = [];
+      scaleFactor   = null;
+      medPts        = [];
+      lastMedDistCm = null;
+      medReadout.textContent = '';
       document.getElementById('btn-calib').textContent = '📏 Calibrar';
+      document.getElementById('btn-medir').textContent = '📐 Medir';
       resolve();
     };
   });
@@ -736,12 +720,12 @@ function draw(result) {
   ctx.save();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Pontos de calibração (sempre visíveis)
+  // Pontos de calibração e de medição manual (sempre visíveis)
   drawCalibPoints();
+  drawMedPoints();
 
   if (!result.landmarks || result.landmarks.length === 0) {
     angleLblEl.textContent = 'sem deteção — ajusta o enquadramento';
-    clearSegs();
     ctx.restore();
     return;
   }
@@ -772,11 +756,16 @@ function draw(result) {
   const hipPx  = toPx(hip);
   const headPx = toPx(head);
 
-  // Linha do tronco (amarela): anca → testa, sem marcadores nas extremidades.
+  // Linha do tronco (amarela): anca → além da cabeça, sem marcadores nas extremidades.
+  // Prolonga-se 35% para além do ponto entre os olhos para "passar" visualmente a cabeça.
   // É só referência visual — o ângulo clínico abaixo continua a usar anca→ombro,
   // porque a cabeça pode inclinar-se de forma independente do tronco e isso
   // contaminaria a medida se a usássemos para o cálculo.
-  drawSegment(hipPx, headPx, '#ffd23d', 3);
+  const lineEndPx = {
+    x: hipPx.x + (headPx.x - hipPx.x) * 1.35,
+    y: hipPx.y + (headPx.y - hipPx.y) * 1.35,
+  };
+  drawSegment(hipPx, lineEndPx, '#ffd23d', 3);
 
   // Linha pélvica de referência (vertical, fina, tracejada, amarela)
   // — passa no centro da linha anca-anca, no mesmo estilo das 2 linhas laterais dos MMII
@@ -802,6 +791,19 @@ function draw(result) {
   const rawAngle = Math.atan2(tx, -ty) * (180 / Math.PI);
   const angle    = smooth(rawAngle);
 
+  // Log contínuo do ângulo durante a avaliação — captura a oscilação
+  // pendular esquerda/direita do tronco ao longo da marcha.
+  // Amostragem limitada a ~6-7 Hz (passo de 0.15s): suficiente para a
+  // cadência típica de marcha (<3 Hz) e evita arrays demasiado grandes
+  // numa avaliação de vários minutos.
+  if (sessaoAtiva) {
+    const tNow = (performance.now() - avalStartTime) / 1000;
+    if (tNow - lastLogT >= 0.15) {
+      angleLog.push({ t: tNow, a: angle });
+      lastLogT = tNow;
+    }
+  }
+
   // Calcular distâncias segmentares
   const akE_px = segPx(lm[27], lm[25]);  // tornozelo E → joelho E
   const khE_px = segPx(lm[25], lm[23]);  // joelho E → anca E
@@ -819,12 +821,6 @@ function draw(result) {
   angleLblEl.textContent = scaleFactor
     ? `desvio do tronco da vertical  ·  + / - indica o lado`
     : `desvio do tronco da vertical  ·  calibra para medidas em cm`;
-
-  // UI — segmentos
-  setSegs({
-    akE: toCm(akE_px), khE: toCm(khE_px), totE: toCm(totE_px),
-    akD: toCm(akD_px), khD: toCm(khD_px), totD: toCm(totD_px),
-  });
 
   // Guardar métricas correntes para snapshot
   currentM = {
@@ -873,23 +869,33 @@ function drawCalibPoints() {
   }
 }
 
-function setSegs(d) {
-  const fmt = v => v ? v + ' cm' : '—';
-  document.getElementById('ank-knee-esq').textContent = fmt(d.akE);
-  document.getElementById('knee-hip-esq').textContent = fmt(d.khE);
-  document.getElementById('total-esq').textContent    = fmt(d.totE);
-  document.getElementById('ank-knee-dir').textContent = fmt(d.akD);
-  document.getElementById('knee-hip-dir').textContent = fmt(d.khD);
-  document.getElementById('total-dir').textContent    = fmt(d.totD);
-}
-
-function clearSegs() {
-  ['ank-knee-esq','knee-hip-esq','total-esq','ank-knee-dir','knee-hip-dir','total-dir']
-    .forEach(id => { document.getElementById(id).textContent = '—'; });
+function drawMedPoints() {
+  medPts.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 8, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(59,130,246,0.9)';
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font      = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(i + 1, p.x, p.y);
+  });
+  if (medPts.length === 2) {
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth   = 2;
+    ctx.strokeStyle = 'rgba(59,130,246,0.85)';
+    ctx.beginPath();
+    ctx.moveTo(medPts[0].x, medPts[0].y);
+    ctx.lineTo(medPts[1].x, medPts[1].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 // ── Calibração ──
 window.iniciarCalibracao = function() {
+  if (medMode) cancelarMedicao();
   calibMode = true;
   calibPts  = [];
   scaleFactor = null;
@@ -964,17 +970,84 @@ function handleCalib(e) {
   }
 }
 
-canvas.addEventListener('click',      handleCalib);
-canvas.addEventListener('touchstart', handleCalib, { passive: false });
+canvas.addEventListener('click',      handleCanvasTap);
+canvas.addEventListener('touchstart', handleCanvasTap, { passive: false });
+
+function handleCanvasTap(e) {
+  if (calibMode) { handleCalib(e); return; }
+  if (medMode)   { handleMedicao(e); return; }
+}
+
+// ── Medição manual (rato/toque): 2 pontos → distância em cm ──
+window.iniciarMedicao = function() {
+  if (calibMode) cancelarCalibracao();
+  medMode = true;
+  medPts  = [];
+  canvas.style.pointerEvents = 'auto';
+  modeHint.textContent = '📐 Toca em 2 pontos para medir a distância entre eles';
+  modeHint.classList.add('show');
+  statusMsg.textContent = 'Medição ativa — toca no 1.º ponto';
+  const btn = document.getElementById('btn-medir');
+  btn.textContent = '✕ Cancelar medição';
+  btn.onclick = cancelarMedicao;
+};
+
+function cancelarMedicao() {
+  medMode = false;
+  medPts  = [];
+  canvas.style.pointerEvents = 'none';
+  modeHint.classList.remove('show');
+  statusMsg.textContent = 'Medição cancelada';
+  const btn = document.getElementById('btn-medir');
+  btn.textContent = '📐 Medir';
+  btn.onclick = iniciarMedicao;
+}
+
+function handleMedicao(e) {
+  if (!medMode) return;
+  e.preventDefault();
+  const pt = canvasPoint(e);
+  medPts.push(pt);
+
+  if (medPts.length === 1) {
+    modeHint.textContent = '📐 Agora toca no 2.º ponto';
+    statusMsg.textContent = 'Medição — toca no 2.º ponto';
+  } else if (medPts.length === 2) {
+    const dx = medPts[1].x - medPts[0].x;
+    const dy = medPts[1].y - medPts[0].y;
+    const distPx = Math.hypot(dx, dy);
+    medMode = false;
+    canvas.style.pointerEvents = 'none';
+    const btn = document.getElementById('btn-medir');
+    btn.textContent = '📐 Medir';
+    btn.onclick = iniciarMedicao;
+
+    if (!scaleFactor) {
+      modeHint.textContent = '⚠ Calibra primeiro (📏) para obter medidas em cm';
+      setTimeout(() => modeHint.classList.remove('show'), 2500);
+      medReadout.textContent = '';
+      statusMsg.textContent = 'Medição sem calibração — sem valor em cm';
+      return;
+    }
+    lastMedDistCm = (distPx * scaleFactor).toFixed(1);
+    modeHint.textContent = `✅ ${lastMedDistCm} cm`;
+    setTimeout(() => modeHint.classList.remove('show'), 2500);
+    medReadout.textContent = `📐 Última medição: ${lastMedDistCm} cm`;
+    statusMsg.textContent = `Medição: ${lastMedDistCm} cm`;
+  }
+}
 
 // ── Controlo da sessão ──
 window.iniciarAvaliacao = function() {
-  sessaoAtiva = true;
-  snapshots   = [];
+  sessaoAtiva   = true;
+  snapshots     = [];
+  angleLog      = [];
+  avalStartTime = performance.now();
+  lastLogT      = -1;
   document.getElementById('btn-ini').disabled  = true;
   document.getElementById('btn-reg').disabled  = false;
   document.getElementById('btn-term').disabled = false;
-  statusMsg.textContent = '▶ Avaliação em curso…';
+  statusMsg.textContent = '▶ Avaliação em curso… (a registar desvio do tronco)';
 };
 
 window.registarMedidas = function() {
@@ -997,6 +1070,20 @@ window.terminarAvaliacao = function() {
 // ── Modal de resumo ──
 function mostrarResumo() {
   document.getElementById('sum-pac').textContent = `${pacNome} · ${pacData}`;
+
+  const statsEl = document.getElementById('sum-angle-stats');
+  const stats = calcStatsAngulo(angleLog);
+  if (!stats) {
+    statsEl.innerHTML = '<div class="stat-card" style="grid-column:1/-1">Sem dados de oscilação do tronco registados nesta avaliação.</div>';
+  } else {
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-lbl">Amplitude pico-a-pico</div><div class="stat-val">${stats.amplitude.toFixed(1)}°</div></div>
+      <div class="stat-card"><div class="stat-lbl">Duração registada</div><div class="stat-val">${angleLog[angleLog.length-1].t.toFixed(1)} s</div></div>
+      <div class="stat-card"><div class="stat-lbl">Máx. para um lado</div><div class="stat-val">${stats.max>=0?'+':''}${stats.max.toFixed(1)}°</div></div>
+      <div class="stat-card"><div class="stat-lbl">Máx. para o outro lado</div><div class="stat-val">${stats.min>=0?'+':''}${stats.min.toFixed(1)}°</div></div>
+    `;
+  }
+
   const tbody = document.getElementById('sum-body');
   tbody.innerHTML = '';
   const wrap  = document.getElementById('sum-table-wrap');
@@ -1047,6 +1134,166 @@ window.copiarResumo = async function() {
   } catch {
     alert('Copia o texto manualmente:\n\n' + header + rows);
   }
+};
+
+// ── Estatísticas do desvio do tronco (oscilação esq/dir durante a marcha) ──
+// NOTA METODOLÓGICA: isto é uma descrição estatística do sinal angular ao longo
+// de toda a avaliação, não uma análise ciclo-a-ciclo (não há deteção de
+// heel-strike/passo). Para isso seria necessário um algoritmo de deteção de
+// eventos da marcha, que não está implementado aqui — fica como limitação
+// conhecida, não como omissão silenciosa.
+function calcStatsAngulo(log) {
+  if (!log.length) return null;
+  const vals = log.map(p => p.a);
+  const max  = Math.max(...vals);   // maior inclinação para um lado (sinal +)
+  const min  = Math.min(...vals);   // maior inclinação para o outro lado (sinal -)
+  const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+  const meanAbs = vals.reduce((s, v) => s + Math.abs(v), 0) / vals.length;
+  const variance = vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length;
+  const std = Math.sqrt(variance);
+  return { max, min, mean, meanAbs, std, amplitude: max - min, n: vals.length };
+}
+
+// ── Gráfico do desvio do tronco ao longo do tempo (canvas → PNG para o PDF) ──
+function desenharGraficoAngulo(log) {
+  const W = 760, H = 300, PAD_L = 46, PAD_R = 16, PAD_T = 18, PAD_B = 34;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+
+  g.fillStyle = '#0b1014';
+  g.fillRect(0, 0, W, H);
+
+  const vals  = log.map(p => p.a);
+  const tMax  = Math.max(log[log.length - 1].t, 1);
+  const aMax  = Math.max(8, Math.ceil(Math.max(...vals.map(Math.abs)) * 1.2));
+  const x     = t => PAD_L + (t / tMax) * (W - PAD_L - PAD_R);
+  const y     = a => H / 2 - (a / aMax) * ((H - PAD_T - PAD_B) / 2);
+
+  // Zonas de referência (±5° verde claro, ±15° amarelo) — coerente com as cores do readout em direto
+  g.fillStyle = 'rgba(61,220,151,0.08)';
+  g.fillRect(PAD_L, y(5), W - PAD_L - PAD_R, y(-5) - y(5));
+
+  // Linha zero
+  g.strokeStyle = 'rgba(255,255,255,0.35)';
+  g.setLineDash([4, 4]);
+  g.beginPath(); g.moveTo(PAD_L, y(0)); g.lineTo(W - PAD_R, y(0)); g.stroke();
+  g.setLineDash([]);
+
+  // Eixos
+  g.strokeStyle = 'rgba(255,255,255,0.5)';
+  g.lineWidth = 1;
+  g.beginPath();
+  g.moveTo(PAD_L, PAD_T); g.lineTo(PAD_L, H - PAD_B); g.lineTo(W - PAD_R, H - PAD_B);
+  g.stroke();
+
+  // Labels eixo Y
+  g.fillStyle = '#9fb0b8'; g.font = '11px monospace'; g.textAlign = 'right'; g.textBaseline = 'middle';
+  [-aMax, -aMax / 2, 0, aMax / 2, aMax].forEach(v => g.fillText(v.toFixed(0) + '°', PAD_L - 6, y(v)));
+
+  // Labels eixo X (tempo)
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let i = 0; i <= 4; i++) {
+    const t = (tMax / 4) * i;
+    g.fillText(t.toFixed(0) + 's', x(t), H - PAD_B + 6);
+  }
+
+  // Curva do ângulo
+  g.strokeStyle = '#ffd23d';
+  g.lineWidth = 2;
+  g.beginPath();
+  log.forEach((p, i) => {
+    const px = x(p.t), py = y(Math.max(-aMax, Math.min(aMax, p.a)));
+    if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
+  });
+  g.stroke();
+
+  return c.toDataURL('image/png');
+}
+
+// ── Geração do relatório PDF ──
+window.gerarPDF = function() {
+  if (!angleLog.length) {
+    alert('Ainda não há dados de avaliação registados (carrega em "▶ Iniciar" e depois "■ Terminar" primeiro).');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc   = new jsPDF({ unit: 'mm', format: 'a4' });
+  const stats = calcStatsAngulo(angleLog);
+  const dur   = angleLog[angleLog.length - 1].t;
+
+  // Cabeçalho
+  doc.setFillColor(11, 16, 20);
+  doc.rect(0, 0, 210, 30, 'F');
+  doc.setTextColor(61, 220, 151);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+  doc.text('GaitAnalysis', 14, 15);
+  doc.setTextColor(230, 238, 240);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  doc.text('Relatório de Avaliação da Marcha  ·  Ortopedia Universal  ·  João Santos', 14, 23);
+
+  // Dados do paciente
+  doc.setTextColor(20, 20, 20);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.text('Dados da avaliação', 14, 42);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+  doc.text(`Paciente: ${pacNome || '—'}`, 14, 49);
+  doc.text(`Data: ${pacData || '—'}`, 14, 55);
+  doc.text(`Duração registada: ${dur.toFixed(1)} s   ·   ${stats.n} amostras (~${(stats.n/dur).toFixed(1)} Hz)`, 14, 61);
+
+  // Resumo biomecânico
+  doc.setDrawColor(220, 224, 226);
+  doc.line(14, 67, 196, 67);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.text('Desvio do tronco no plano frontal — resumo da oscilação', 14, 76);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+  const linhas = [
+    `Inclinação máxima para um lado:        ${stats.max >= 0 ? '+' : ''}${stats.max.toFixed(1)}°`,
+    `Inclinação máxima para o lado oposto:  ${stats.min >= 0 ? '+' : ''}${stats.min.toFixed(1)}°`,
+    `Amplitude pico-a-pico (esq./dir.):     ${stats.amplitude.toFixed(1)}°`,
+    `Média do desvio (com sinal):           ${stats.mean >= 0 ? '+' : ''}${stats.mean.toFixed(1)}°`,
+    `Média do desvio (valor absoluto):      ${stats.meanAbs.toFixed(1)}°`,
+    `Variabilidade (desvio-padrão):         ${stats.std.toFixed(1)}°`,
+  ];
+  linhas.forEach((l, i) => doc.text(l, 14, 84 + i * 6.2));
+
+  // Gráfico
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.text('Evolução do desvio do tronco durante a avaliação', 14, 130);
+  const imgData = desenharGraficoAngulo(angleLog);
+  doc.addImage(imgData, 'PNG', 14, 134, 182, 72);
+
+  // Tabela de medidas pontuais registadas (se existirem)
+  let yPos = 216;
+  if (snapshots.length) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text('Medidas pontuais registadas', 14, yPos);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    yPos += 6;
+    doc.text('#   Hora        Tronco°   Ank-Jo E   Jo-An E   Tot E    Ank-Jo D   Jo-An D   Tot D', 14, yPos);
+    yPos += 4;
+    snapshots.slice(0, 6).forEach((s, i) => {
+      yPos += 5;
+      doc.text(
+        `${i+1}   ${s.ts}   ${s.angulo_tronco}°   ${s.ank_knee_esq}   ${s.knee_hip_esq}   ${s.total_esq}   ${s.ank_knee_dir}   ${s.knee_hip_dir}   ${s.total_dir}`,
+        14, yPos
+      );
+    });
+    yPos += 6;
+  }
+
+  // Nota metodológica
+  doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+  doc.text(
+    'Ângulo calculado entre o vetor anca→ombro (midpoints) e a vertical da imagem, via MediaPipe Pose ' +
+    '(modelo Lite). O sinal +/- indica o lado de inclinação tal como captado pela câmara, não corrigido ' +
+    'para orientação anatómica. Valores descrevem a oscilação ao longo de toda a avaliação; não há deteção ' +
+    'de eventos individuais da marcha (heel-strike/passo) nesta versão.',
+    14, 280, { maxWidth: 182 }
+  );
+
+  const nomeFicheiro = `GaitAnalysis_${(pacNome || 'paciente').replace(/\s+/g, '_')}_${pacData || ''}.pdf`;
+  doc.save(nomeFicheiro);
 };
 
 // Data de hoje como padrão
