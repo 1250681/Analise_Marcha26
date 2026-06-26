@@ -764,35 +764,42 @@ function draw(result) {
   drawSegment(toPx(lm[24]), toPx(lm[26]), 'rgba(239,68,68,0.75)', 2.5);
   drawSegment(toPx(lm[26]), toPx(lm[28]), 'rgba(239,68,68,0.75)', 2.5);
 
-  // Tronco (amarelo): midpoint ombros → midpoint ancas
-  const sh  = { x: (lm[11].x + lm[12].x) / 2, y: (lm[11].y + lm[12].y) / 2 };
-  const hip = { x: (lm[23].x + lm[24].x) / 2, y: (lm[23].y + lm[24].y) / 2 };
-  const shPx  = toPx(sh);
-  const hipPx = toPx(hip);
-  drawSegment(shPx, hipPx, '#ffd23d', 3);
-  [shPx, hipPx].forEach(p => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
-    ctx.fillStyle = '#ffd23d';
-    ctx.fill();
-  });
+  // Pontos anatómicos: midpoint ombros, midpoint ancas, midpoint olhos (aprox. testa)
+  // (entre os olhos = nasion aproximado; usado só para a linha visual, não para o cálculo do ângulo)
+  const sh   = { x: (lm[11].x + lm[12].x) / 2, y: (lm[11].y + lm[12].y) / 2 };
+  const hip  = { x: (lm[23].x + lm[24].x) / 2, y: (lm[23].y + lm[24].y) / 2 };
+  const head = { x: (lm[2].x  + lm[5].x)  / 2, y: (lm[2].y  + lm[5].y)  / 2 };
+  const hipPx  = toPx(hip);
+  const headPx = toPx(head);
 
-  // Linha vertical de referência no midpoint das ancas
+  // Linha do tronco (amarela): anca → testa, sem marcadores nas extremidades.
+  // É só referência visual — o ângulo clínico abaixo continua a usar anca→ombro,
+  // porque a cabeça pode inclinar-se de forma independente do tronco e isso
+  // contaminaria a medida se a usássemos para o cálculo.
+  drawSegment(hipPx, headPx, '#ffd23d', 3);
+
+  // Linha pélvica de referência (vertical, fina, tracejada, amarela)
+  // — passa no centro da linha anca-anca, no mesmo estilo das 2 linhas laterais dos MMII
   ctx.setLineDash([6, 5]);
   ctx.lineWidth   = 1.5;
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.strokeStyle = 'rgba(255,210,61,0.55)';
   ctx.beginPath();
   ctx.moveTo(hipPx.x, hipPx.y - canvas.height * 0.4);
   ctx.lineTo(hipPx.x, hipPx.y);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Ângulo do tronco em relação à vertical
-  // Vetor tronco: anca → ombro. Em coords de imagem (y para baixo), upward = (0, -1).
+  // Ângulo do tronco em relação à vertical (medida clínica: vetor anca → ombro)
+  // Em coords de imagem (y para baixo), upward = (0, -1).
   const tx = sh.x - hip.x;
   const ty = sh.y - hip.y;  // negativo (ombros acima das ancas)
-  // atan2(deslocamento horizontal, magnitude vertical) → desvio da vertical
-  const rawAngle = Math.abs(Math.atan2(Math.abs(tx), Math.abs(ty)) * (180 / Math.PI));
+  // Sinal preservado em tx: distingue para que lado o tronco se inclina
+  // (positivo/negativo conforme a convenção da câmara — ver nota no label).
+  // NOTA: com câmara frontal (facingMode 'user') a imagem é espelhada via CSS só
+  // para exibição; isto não afeta lm[].x, mas o sinal aqui corresponde à imagem
+  // tal como a câmara a captou, não necessariamente à direita/esquerda anatómica
+  // do paciente — relevante só se mudares de câmara traseira para frontal.
+  const rawAngle = Math.atan2(tx, -ty) * (180 / Math.PI);
   const angle    = smooth(rawAngle);
 
   // Calcular distâncias segmentares
@@ -803,13 +810,14 @@ function draw(result) {
   const khD_px = segPx(lm[26], lm[24]);  // joelho D → anca D
   const totD_px = akD_px + khD_px;
 
-  // UI — ângulo
-  angleValEl.textContent = angle.toFixed(1);
+  // UI — ângulo (com sinal: + e - indicam o lado da inclinação)
+  const absAngle = Math.abs(angle);
+  angleValEl.textContent = (angle > 0 ? '+' : '') + angle.toFixed(1);
   angleValEl.style.color =
-    angle < 5  ? '#3ddc97' :
-    angle < 15 ? '#e8a33d' : '#ef4444';
+    absAngle < 5  ? '#3ddc97' :
+    absAngle < 15 ? '#e8a33d' : '#ef4444';
   angleLblEl.textContent = scaleFactor
-    ? `desvio do tronco da vertical`
+    ? `desvio do tronco da vertical  ·  + / - indica o lado`
     : `desvio do tronco da vertical  ·  calibra para medidas em cm`;
 
   // UI — segmentos
