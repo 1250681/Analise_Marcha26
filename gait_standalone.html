@@ -767,14 +767,15 @@ function draw(result) {
   };
   drawSegment(hipPx, lineEndPx, '#ffd23d', 3);
 
-  // Linha pélvica de referência (vertical, fina, tracejada, amarela)
-  // — passa no centro da linha anca-anca, no mesmo estilo das 2 linhas laterais dos MMII
+  // Linha pélvica de referência (horizontal, fina, tracejada, amarela)
+  // — passa pela altura do midpoint das ancas, ao longo de toda a largura do ecrã.
+  // Útil para avaliar obliquidade pélvica (uma anca mais alta que a outra).
   ctx.setLineDash([6, 5]);
   ctx.lineWidth   = 1.5;
   ctx.strokeStyle = 'rgba(255,210,61,0.55)';
   ctx.beginPath();
-  ctx.moveTo(hipPx.x, hipPx.y - canvas.height * 0.4);
-  ctx.lineTo(hipPx.x, hipPx.y);
+  ctx.moveTo(0, hipPx.y);
+  ctx.lineTo(canvas.width, hipPx.y);
   ctx.stroke();
   ctx.setLineDash([]);
 
