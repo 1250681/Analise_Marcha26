@@ -777,6 +777,19 @@ function draw(result) {
   ctx.moveTo(0, hipPx.y);
   ctx.lineTo(canvas.width, hipPx.y);
   ctx.stroke();
+
+  // Linhas verticais de referência (finas, tracejadas, amarelas) — uma a passar
+  // por cada anca (não seguem mais nenhum landmark, são retas puras, tal como a
+  // linha pélvica horizontal acima — servem para ver se joelho/tornozelo/ombro
+  // do mesmo lado caem ou não na vertical da respetiva anca).
+  const hipLPx = toPx(lm[23]); // anca esquerda
+  const hipRPx = toPx(lm[24]); // anca direita
+  [hipLPx, hipRPx].forEach(p => {
+    ctx.beginPath();
+    ctx.moveTo(p.x, 0);
+    ctx.lineTo(p.x, canvas.height);
+    ctx.stroke();
+  });
   ctx.setLineDash([]);
 
   // Ângulo do tronco em relação à vertical (medida clínica: vetor anca → ombro)
