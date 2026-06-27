@@ -582,18 +582,33 @@ let currentM       = {};             // métricas do frame atual
 let angleLog       = [];             // série temporal {t, a} do ângulo durante a avaliação
 let avalStartTime  = 0;
 let lastLogT       = -1;
+let anguloUltimo   = 0;              // último ângulo válido (mantido quando a confiança cai)
+let anguloConfiavel = true;
 
 // FPS
 let lastFpsTime = performance.now();
 let frmCount    = 0;
 
-// Suavização (média móvel)
-const SMOOTH_N  = 5;
-const angBuf    = [];
-function smooth(v) {
-  angBuf.push(v);
-  if (angBuf.length > SMOOTH_N) angBuf.shift();
-  return angBuf.reduce((a,b) => a+b, 0) / angBuf.length;
+// Suavização (média móvel) — generalizada: um buffer próprio por métrica,
+// identificado por chave (ex. 'angulo', 'akE', 'khD'...), em vez de um único
+// buffer global que só servia para o ângulo do tronco.
+const SMOOTH_N    = 5;
+const smoothBufs  = {};
+function smooth(key, v) {
+  if (!smoothBufs[key]) smoothBufs[key] = [];
+  const buf = smoothBufs[key];
+  buf.push(v);
+  if (buf.length > SMOOTH_N) buf.shift();
+  return buf.reduce((a, b) => a + b, 0) / buf.length;
+}
+
+// Limiar de confiança dos landmarks (campo `visibility` do MediaPipe, 0-1).
+// Abaixo disto, o ponto está provavelmente oculto/adivinhado pelo modelo —
+// preferível não calcular nada com ele do que mostrar um número "preciso"
+// vindo de uma estimativa pouco fiável.
+const VIS_THRESH = 0.5;
+function visOk(...lms) {
+  return lms.every(l => (l.visibility ?? 1) >= VIS_THRESH);
 }
 
 // ── DOM ──
@@ -711,7 +726,7 @@ function segPx(a, b) {
 }
 
 function toCm(px) {
-  if (!scaleFactor) return null;
+  if (!scaleFactor || px == null) return null;
   return (px * scaleFactor).toFixed(1);
 }
 
@@ -798,23 +813,31 @@ function draw(result) {
 
   // Ângulo do tronco em relação à vertical (medida clínica: vetor anca → ombro)
   // Em coords de imagem (y para baixo), upward = (0, -1).
-  const tx = sh.x - hip.x;
-  const ty = sh.y - hip.y;  // negativo (ombros acima das ancas)
-  // Sinal preservado em tx: distingue para que lado o tronco se inclina
-  // (positivo/negativo conforme a convenção da câmara — ver nota no label).
-  // NOTA: com câmara frontal (facingMode 'user') a imagem é espelhada via CSS só
-  // para exibição; isto não afeta lm[].x, mas o sinal aqui corresponde à imagem
-  // tal como a câmara a captou, não necessariamente à direita/esquerda anatómica
-  // do paciente — relevante só se mudares de câmara traseira para frontal.
-  const rawAngle = Math.atan2(tx, -ty) * (180 / Math.PI);
-  const angle    = smooth(rawAngle);
+  // Só calcula/atualiza se ombros e ancas tiverem confiança suficiente —
+  // caso contrário mantém o último ângulo válido em vez de saltar com ruído.
+  anguloConfiavel = visOk(lm[11], lm[12], lm[23], lm[24]);
+  if (anguloConfiavel) {
+    const tx = sh.x - hip.x;
+    const ty = sh.y - hip.y;  // negativo (ombros acima das ancas)
+    // Sinal preservado em tx: distingue para que lado o tronco se inclina
+    // (positivo/negativo conforme a convenção da câmara — ver nota no label).
+    // NOTA: com câmara frontal (facingMode 'user') a imagem é espelhada via CSS só
+    // para exibição; isto não afeta lm[].x, mas o sinal aqui corresponde à imagem
+    // tal como a câmara a captou, não necessariamente à direita/esquerda anatómica
+    // do paciente — relevante só se mudares de câmara traseira para frontal.
+    const rawAngle = Math.atan2(tx, -ty) * (180 / Math.PI);
+    anguloUltimo = smooth('angulo', rawAngle);
+  }
+  const angle = anguloUltimo;
 
   // Log contínuo do ângulo durante a avaliação — captura a oscilação
   // pendular esquerda/direita do tronco ao longo da marcha.
   // Amostragem limitada a ~6-7 Hz (passo de 0.15s): suficiente para a
   // cadência típica de marcha (<3 Hz) e evita arrays demasiado grandes
   // numa avaliação de vários minutos.
-  if (sessaoAtiva) {
+  // Só regista amostras com confiança suficiente — uma leitura de baixa
+  // confiança no meio da série distorceria as estatísticas (máx/mín/desvio).
+  if (sessaoAtiva && anguloConfiavel) {
     const tNow = (performance.now() - avalStartTime) / 1000;
     if (tNow - lastLogT >= 0.15) {
       angleLog.push({ t: tNow, a: angle });
@@ -822,23 +845,35 @@ function draw(result) {
     }
   }
 
-  // Calcular distâncias segmentares
-  const akE_px = segPx(lm[27], lm[25]);  // tornozelo E → joelho E
-  const khE_px = segPx(lm[25], lm[23]);  // joelho E → anca E
-  const totE_px = akE_px + khE_px;
-  const akD_px = segPx(lm[28], lm[26]);  // tornozelo D → joelho D
-  const khD_px = segPx(lm[26], lm[24]);  // joelho D → anca D
-  const totD_px = akD_px + khD_px;
+  // Calcular distâncias segmentares — cada perna verificada de forma independente,
+  // para que a oclusão de um dos lados não invalide a medida do outro.
+  // Suavizadas com chave própria por métrica (em vez do único buffer antigo
+  // que só servia o ângulo).
+  let akE_px = null, khE_px = null, totE_px = null;
+  if (visOk(lm[23], lm[25], lm[27])) {
+    akE_px  = smooth('akE', segPx(lm[27], lm[25]));  // tornozelo E → joelho E
+    khE_px  = smooth('khE', segPx(lm[25], lm[23]));  // joelho E → anca E
+    totE_px = akE_px + khE_px;
+  }
+  let akD_px = null, khD_px = null, totD_px = null;
+  if (visOk(lm[24], lm[26], lm[28])) {
+    akD_px  = smooth('akD', segPx(lm[28], lm[26]));  // tornozelo D → joelho D
+    khD_px  = smooth('khD', segPx(lm[26], lm[24]));  // joelho D → anca D
+    totD_px = akD_px + khD_px;
+  }
 
   // UI — ângulo (com sinal: + e - indicam o lado da inclinação)
   const absAngle = Math.abs(angle);
   angleValEl.textContent = (angle > 0 ? '+' : '') + angle.toFixed(1);
-  angleValEl.style.color =
-    absAngle < 5  ? '#3ddc97' :
-    absAngle < 15 ? '#e8a33d' : '#ef4444';
-  angleLblEl.textContent = scaleFactor
-    ? `desvio do tronco da vertical  ·  + / - indica o lado`
-    : `desvio do tronco da vertical  ·  calibra para medidas em cm`;
+  angleValEl.style.color = !anguloConfiavel
+    ? '#7f9098'
+    : absAngle < 5  ? '#3ddc97' :
+      absAngle < 15 ? '#e8a33d' : '#ef4444';
+  angleLblEl.textContent = !anguloConfiavel
+    ? `⚠ baixa confiança (ombro/anca pouco visível) — a mostrar última leitura`
+    : scaleFactor
+      ? `desvio do tronco da vertical  ·  + / - indica o lado`
+      : `desvio do tronco da vertical  ·  calibra para medidas em cm`;
 
   // Guardar métricas correntes para snapshot
   currentM = {
