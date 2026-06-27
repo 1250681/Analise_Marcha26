@@ -433,9 +433,10 @@ td {
   white-space: nowrap;
 }
 tr:nth-child(even) td { background: var(--panel); }
-.sum-btns { display: flex; gap: 10px; margin-top: 4px; }
+.sum-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
 .sum-btns button {
-  flex: 1;
+  flex: 1 1 calc(50% - 5px);
+  min-width: 120px;
   height: 48px;
   border: none;
   border-radius: 12px;
@@ -446,6 +447,7 @@ tr:nth-child(even) td { background: var(--panel); }
 }
 .btn-copy  { background: var(--accent); color: #06140e; }
 .btn-pdf   { background: linear-gradient(135deg, var(--blue), var(--accent)); color: #06140e; font-weight: 800; }
+.btn-video { background: linear-gradient(135deg, #ff7a59, var(--warn)); color: #1a0e00; font-weight: 800; }
 .btn-close { background: var(--panel); color: var(--text); border: 1px solid var(--line) !important; }
 </style>
 </head>
@@ -552,6 +554,7 @@ tr:nth-child(even) td { background: var(--panel); }
   </div>
   <div class="sum-btns">
     <button class="btn-pdf"   onclick="gerarPDF()">📄 Gerar PDF</button>
+    <button class="btn-video" id="btn-video" onclick="descarregarVideo()" style="display:none;">🎥 Vídeo</button>
     <button class="btn-copy"  onclick="copiarResumo()">📋 Copiar</button>
     <button class="btn-close" onclick="fecharResumo()">✕ Fechar</button>
   </div>
@@ -584,6 +587,16 @@ let avalStartTime  = 0;
 let lastLogT       = -1;
 let anguloUltimo   = 0;              // último ângulo válido (mantido quando a confiança cai)
 let anguloConfiavel = true;
+
+// Gravação de vídeo (exportação MP4/WebM da avaliação)
+let gravando       = false;
+let mediaRecorder  = null;
+let recChunks      = [];
+let recCanvas      = null;
+let recCtx         = null;
+let recMime        = '';
+let recExt         = '';
+let recBlobUrl     = null;
 
 // FPS
 let lastFpsTime = performance.now();
@@ -887,6 +900,7 @@ function draw(result) {
   };
 
   ctx.restore();
+  compositarFrameGravacao();
 }
 
 function drawSegment(a, b, color, width) {
@@ -1090,6 +1104,107 @@ function handleMedicao(e) {
   }
 }
 
+// ── Gravação de vídeo (vídeo + esqueleto/linhas compostos num canvas próprio) ──
+// NOTA DE COMPATIBILIDADE: nem todos os browsers conseguem gravar diretamente
+// em .mp4 via MediaRecorder (Safari sim; Chrome/Firefox tipicamente só .webm).
+// A app tenta .mp4 primeiro e usa .webm como alternativa — o ficheiro reproduz-se
+// normalmente em qualquer browser/VLC de qualquer forma, só a extensão muda.
+function escolherFormatoVideo() {
+  const candidatos = [
+    { mime: 'video/mp4;codecs=h264', ext: 'mp4' },
+    { mime: 'video/mp4',             ext: 'mp4' },
+    { mime: 'video/webm;codecs=vp9', ext: 'webm' },
+    { mime: 'video/webm;codecs=vp8', ext: 'webm' },
+    { mime: 'video/webm',            ext: 'webm' },
+  ];
+  for (const c of candidatos) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(c.mime)) return c;
+  }
+  return null;
+}
+
+function iniciarGravacao() {
+  recBlobUrl = null;
+  if (!window.MediaRecorder || !canvas.captureStream) {
+    statusMsg.textContent += '  ·  ⚠ gravação de vídeo não suportada neste browser';
+    return;
+  }
+  const formato = escolherFormatoVideo();
+  if (!formato) {
+    statusMsg.textContent += '  ·  ⚠ nenhum formato de vídeo suportado';
+    return;
+  }
+  recMime = formato.mime;
+  recExt  = formato.ext;
+
+  recCanvas = document.createElement('canvas');
+  recCanvas.width  = canvas.width;
+  recCanvas.height = canvas.height;
+  recCanvas.style.display = 'none';
+  document.body.appendChild(recCanvas);
+  recCtx = recCanvas.getContext('2d');
+
+  try {
+    const stream = recCanvas.captureStream(25);
+    recChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: recMime });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+    mediaRecorder.start();
+    gravando = true;
+  } catch (err) {
+    console.error('Falha ao iniciar gravação:', err);
+    gravando = false;
+  }
+}
+
+function pararGravacao() {
+  return new Promise(resolve => {
+    if (!gravando || !mediaRecorder) { resolve(); return; }
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recChunks, { type: recMime });
+      recBlobUrl = URL.createObjectURL(blob);
+      gravando = false;
+      if (recCanvas && recCanvas.parentNode) recCanvas.parentNode.removeChild(recCanvas);
+      resolve();
+    };
+    mediaRecorder.stop();
+  });
+}
+
+// Composição do frame de gravação: vídeo real + esqueleto/linhas já desenhados
+// no canvas visível + leitura do ângulo "queimada" na imagem (para o vídeo
+// ser autocontido, sem depender dos painéis HTML que não são capturados).
+function compositarFrameGravacao() {
+  if (!gravando || !recCtx) return;
+  recCtx.save();
+  if (isMirrored) {
+    recCtx.translate(recCanvas.width, 0);
+    recCtx.scale(-1, 1);
+  }
+  recCtx.drawImage(video, 0, 0, recCanvas.width, recCanvas.height);
+  recCtx.drawImage(canvas, 0, 0, recCanvas.width, recCanvas.height);
+  recCtx.restore();
+
+  // Leitura do ângulo + timestamp, em overlay simples (não espelhado)
+  const txt = `${anguloUltimo > 0 ? '+' : ''}${anguloUltimo.toFixed(1)}°  ·  desvio do tronco`;
+  recCtx.font = `bold ${Math.round(recCanvas.width * 0.045)}px monospace`;
+  recCtx.textBaseline = 'bottom';
+  recCtx.fillStyle = 'rgba(0,0,0,0.55)';
+  recCtx.fillRect(0, recCanvas.height - recCanvas.width * 0.09, recCanvas.width, recCanvas.width * 0.09);
+  recCtx.fillStyle = '#ffd23d';
+  recCtx.fillText(txt, recCanvas.width * 0.03, recCanvas.height - recCanvas.width * 0.02);
+}
+
+window.descarregarVideo = function() {
+  if (!recBlobUrl) return;
+  const a = document.createElement('a');
+  a.href = recBlobUrl;
+  a.download = `GaitAnalysis_${(pacNome || 'paciente').replace(/\s+/g, '_')}_${pacData || ''}.${recExt}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+};
+
 // ── Controlo da sessão ──
 window.iniciarAvaliacao = function() {
   sessaoAtiva   = true;
@@ -1101,6 +1216,7 @@ window.iniciarAvaliacao = function() {
   document.getElementById('btn-reg').disabled  = false;
   document.getElementById('btn-term').disabled = false;
   statusMsg.textContent = '▶ Avaliação em curso… (a registar desvio do tronco)';
+  iniciarGravacao();
 };
 
 window.registarMedidas = function() {
@@ -1111,11 +1227,13 @@ window.registarMedidas = function() {
   setTimeout(() => snapFlash.classList.remove('show'), 1200);
 };
 
-window.terminarAvaliacao = function() {
+window.terminarAvaliacao = async function() {
   sessaoAtiva = false;
   document.getElementById('btn-ini').disabled  = false;
   document.getElementById('btn-reg').disabled  = true;
   document.getElementById('btn-term').disabled = true;
+  statusMsg.textContent = '■ Avaliação terminada — a finalizar vídeo…';
+  await pararGravacao();
   statusMsg.textContent = '■ Avaliação terminada';
   mostrarResumo();
 };
@@ -1123,6 +1241,7 @@ window.terminarAvaliacao = function() {
 // ── Modal de resumo ──
 function mostrarResumo() {
   document.getElementById('sum-pac').textContent = `${pacNome} · ${pacData}`;
+  document.getElementById('btn-video').style.display = recBlobUrl ? 'block' : 'none';
 
   const statsEl = document.getElementById('sum-angle-stats');
   const stats = calcStatsAngulo(angleLog);
