@@ -123,6 +123,25 @@ video, canvas {
 }
 #overlay { pointer-events: none; }
 
+/* Guia de alinhamento da câmara — cruz tracejada fixa, centrada no ecrã,
+   independente de qualquer landmark. Serve para verificares, antes de o
+   paciente entrar em cena, se o tablet/câmara está bem nivelado e centrado
+   (ex.: alinhar a linha vertical com a ombreira de uma porta). Desaparece
+   automaticamente ao iniciar a avaliação, para não competir visualmente
+   com as linhas reais durante o teste. */
+#align-guide { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+#align-guide::before, #align-guide::after { content: ''; position: absolute; }
+#align-guide::before {
+  left: 50%; top: 0; bottom: 0; width: 0;
+  border-left: 2px dashed rgba(255,255,255,0.55);
+  transform: translateX(-50%);
+}
+#align-guide::after {
+  top: 50%; left: 0; right: 0; height: 0;
+  border-top: 2px dashed rgba(255,255,255,0.55);
+  transform: translateY(-50%);
+}
+
 /* TOP BAR */
 #topbar {
   position: absolute;
@@ -474,6 +493,7 @@ tr:nth-child(even) td { background: var(--panel); }
 <div id="page-session">
   <video id="video" autoplay playsinline muted></video>
   <canvas id="overlay"></canvas>
+  <div id="align-guide"></div>
 
   <div id="topbar">
     <div class="top-left">
@@ -1216,6 +1236,7 @@ window.iniciarAvaliacao = function() {
   document.getElementById('btn-reg').disabled  = false;
   document.getElementById('btn-term').disabled = false;
   statusMsg.textContent = '▶ Avaliação em curso… (a registar desvio do tronco)';
+  document.getElementById('align-guide').style.display = 'none';
   iniciarGravacao();
 };
 
@@ -1233,6 +1254,7 @@ window.terminarAvaliacao = async function() {
   document.getElementById('btn-reg').disabled  = true;
   document.getElementById('btn-term').disabled = true;
   statusMsg.textContent = '■ Avaliação terminada — a finalizar vídeo…';
+  document.getElementById('align-guide').style.display = 'block';
   await pararGravacao();
   statusMsg.textContent = '■ Avaliação terminada';
   mostrarResumo();
