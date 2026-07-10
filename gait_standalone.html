@@ -28,7 +28,6 @@ html, body {
   -webkit-user-select: none;
   user-select: none;
 }
-
 /* ── REGISTO ── */
 #page-reg {
   position: fixed;
@@ -105,7 +104,6 @@ html, body {
   transition: background 0.2s;
 }
 .reg-btn:active { background: var(--acc-dim); }
-
 /* ── SESSÃO ── */
 #page-session {
   position: fixed;
@@ -113,7 +111,6 @@ html, body {
   background: var(--bg);
   display: none;
 }
-
 video, canvas {
   position: absolute;
   top: 0; left: 0;
@@ -121,8 +118,14 @@ video, canvas {
   height: 100%;
   object-fit: cover;
 }
+/* O <video> deixa de ser mostrado diretamente: o frame é desenhado manualmente
+   no canvas principal (já rodado/espelhado conforme necessário — ver JS,
+   compositeSourceFrame). Isto garante que o que se vê no ecrã e o que o
+   MediaPipe recebe para deteção são exatamente a mesma imagem, na mesma
+   orientação. Mantém-se a decorrer (opacity, não display:none) para não
+   arriscar que o browser pare a descodificação de frames. */
+#video { opacity: 0; }
 #overlay { pointer-events: none; }
-
 /* Guia de alinhamento da câmara — cruz tracejada fixa, centrada no ecrã,
    independente de qualquer landmark. Serve para verificares, antes de o
    paciente entrar em cena, se o tablet/câmara está bem nivelado e centrado
@@ -141,7 +144,6 @@ video, canvas {
   border-top: 2px dashed rgba(255,255,255,0.55);
   transform: translateY(-50%);
 }
-
 /* TOP BAR */
 #topbar {
   position: absolute;
@@ -185,7 +187,6 @@ video, canvas {
   color: var(--text-dim);
   margin-top: 4px;
 }
-
 /* CONTROLS */
 #ctrl-left, #ctrl-right {
   position: absolute;
@@ -197,7 +198,6 @@ video, canvas {
 }
 #ctrl-left  { left: 12px; }
 #ctrl-right { right: 12px; }
-
 .cbtn {
   font-family: var(--mono);
   font-size: 11px;
@@ -219,7 +219,6 @@ video, canvas {
 .cbtn.c-red   { border-color: var(--red);   color: var(--red); }
 .cbtn.c-blue  { border-color: var(--blue);  color: var(--blue); }
 .cbtn.c-warn  { border-color: var(--warn);  color: var(--warn); }
-
 /* MODE HINT */
 #mode-hint {
   position: absolute;
@@ -239,7 +238,6 @@ video, canvas {
   line-height: 1.4;
 }
 #mode-hint.show { display: block; }
-
 /* SNAP FLASH */
 #snap-flash {
   position: absolute;
@@ -257,7 +255,6 @@ video, canvas {
   display: none;
 }
 #snap-flash.show { display: block; }
-
 /* BOTTOM READOUT */
 #readout {
   position: absolute;
@@ -267,7 +264,6 @@ video, canvas {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 18px);
   background: linear-gradient(0deg, rgba(11,16,20,0.97) 0%, rgba(11,16,20,0.55) 80%, transparent 100%);
 }
-
 /* Angle */
 .angle-row {
   display: flex;
@@ -297,7 +293,6 @@ video, canvas {
   margin-top: 2px;
   margin-bottom: 11px;
 }
-
 /* Segments */
 /* Medição manual (rato/toque) */
 #med-readout {
@@ -308,7 +303,6 @@ video, canvas {
   min-height: 18px;
   margin-bottom: 10px;
 }
-
 /* Status */
 #status-bar {
   display: flex;
@@ -323,7 +317,6 @@ video, canvas {
   border-radius: 7px;
   padding: 5px 12px;
 }
-
 /* LOADING / ERROR */
 #loading {
   position: absolute;
@@ -365,7 +358,6 @@ video, canvas {
 }
 #error-box.show { display: flex; }
 #error-box strong { color: var(--warn); display: block; margin-bottom: 10px; font-size: 16px; }
-
 /* SUMMARY MODAL */
 #summary {
   position: fixed;
@@ -471,7 +463,6 @@ tr:nth-child(even) td { background: var(--panel); }
 </style>
 </head>
 <body>
-
 <!-- ── REGISTO ── -->
 <div id="page-reg">
   <div class="reg-title">Gait<span>Analysis</span></div>
@@ -488,13 +479,11 @@ tr:nth-child(even) td { background: var(--panel); }
     <button class="reg-btn" onclick="comecarSessao()">Avaliação →</button>
   </div>
 </div>
-
 <!-- ── SESSÃO ── -->
 <div id="page-session">
   <video id="video" autoplay playsinline muted></video>
   <canvas id="overlay"></canvas>
   <div id="align-guide"></div>
-
   <div id="topbar">
     <div class="top-left">
       <div class="top-app">
@@ -505,36 +494,30 @@ tr:nth-child(even) td { background: var(--panel); }
     </div>
     <div id="fps-label">-- fps</div>
   </div>
-
   <div id="ctrl-left">
     <button class="cbtn" onclick="flipCamera()">⟲ Câmara</button>
+    <button class="cbtn" id="btn-rot" onclick="rodarCamara()">🔄 Rodar (0°)</button>
     <button class="cbtn c-warn" id="btn-calib" onclick="iniciarCalibracao()">📏 Calibrar</button>
     <button class="cbtn c-blue" id="btn-medir" onclick="iniciarMedicao()">📐 Medir</button>
   </div>
-
   <div id="ctrl-right">
     <button class="cbtn c-green" id="btn-ini"  onclick="iniciarAvaliacao()">▶ Iniciar</button>
     <button class="cbtn c-blue"  id="btn-reg"  onclick="registarMedidas()" disabled>📌 Registar</button>
     <button class="cbtn c-red"   id="btn-term" onclick="terminarAvaliacao()" disabled>■ Terminar</button>
   </div>
-
   <div id="mode-hint"></div>
   <div id="snap-flash">✓ REGISTADO</div>
-
   <div id="readout">
     <div class="angle-row">
       <span id="angle-val">--</span>
       <span class="angle-unit">°</span>
     </div>
     <div id="angle-lbl">desvio do tronco da vertical</div>
-
     <div id="med-readout"></div>
-
     <div id="status-bar">
       <span id="status-msg">A carregar modelo…</span>
     </div>
   </div>
-
   <div id="loading">
     <div class="spinner"></div>
     <div>A carregar MediaPipe Pose…<br>Pode demorar alguns segundos.</div>
@@ -547,7 +530,6 @@ tr:nth-child(even) td { background: var(--panel); }
     </div>
   </div>
 </div>
-
 <!-- ── RESUMO DA SESSÃO ── -->
 <div id="summary">
   <div class="sum-title">Relatório da Sessão</div>
@@ -579,18 +561,17 @@ tr:nth-child(even) td { background: var(--panel); }
     <button class="btn-close" onclick="fecharResumo()">✕ Fechar</button>
   </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script type="module">
 import { PoseLandmarker, FilesetResolver, DrawingUtils }
   from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
-
 // ── Estado ──
 let poseLandmarker = null;
 let drawingUtils   = null;
 let lastVideoTime  = -1;
 let facingMode     = 'environment';  // câmara traseira por defeito (plano sagital)
 let isMirrored     = false;
+let rotateDeg      = 0;              // 0/90/180/270 — rotação manual do frame (ver rodarCamara)
 let scaleFactor    = null;           // cm por pixel de canvas
 let calibMode      = false;
 let calibPts       = [];
@@ -607,7 +588,6 @@ let avalStartTime  = 0;
 let lastLogT       = -1;
 let anguloUltimo   = 0;              // último ângulo válido (mantido quando a confiança cai)
 let anguloConfiavel = true;
-
 // Gravação de vídeo (exportação MP4/WebM da avaliação)
 let gravando       = false;
 let mediaRecorder  = null;
@@ -617,11 +597,9 @@ let recCtx         = null;
 let recMime        = '';
 let recExt         = '';
 let recBlobUrl     = null;
-
 // FPS
 let lastFpsTime = performance.now();
 let frmCount    = 0;
-
 // Suavização (média móvel) — generalizada: um buffer próprio por métrica,
 // identificado por chave (ex. 'angulo', 'akE', 'khD'...), em vez de um único
 // buffer global que só servia para o ângulo do tronco.
@@ -634,7 +612,6 @@ function smooth(key, v) {
   if (buf.length > SMOOTH_N) buf.shift();
   return buf.reduce((a, b) => a + b, 0) / buf.length;
 }
-
 // Limiar de confiança dos landmarks (campo `visibility` do MediaPipe, 0-1).
 // Abaixo disto, o ponto está provavelmente oculto/adivinhado pelo modelo —
 // preferível não calcular nada com ele do que mostrar um número "preciso"
@@ -643,11 +620,22 @@ const VIS_THRESH = 0.5;
 function visOk(...lms) {
   return lms.every(l => (l.visibility ?? 1) >= VIS_THRESH);
 }
-
 // ── DOM ──
 const video      = document.getElementById('video');
 const canvas     = document.getElementById('overlay');
 const ctx        = canvas.getContext('2d');
+// Canvas intermédio (offscreen, nunca inserido no DOM) onde o frame da câmara
+// é desenhado já rodado (rotateDeg) e espelhado (isMirrored) ANTES de ser
+// entregue tanto ao MediaPipe (deteção) como ao canvas principal (visualização).
+// Isto resolve o caso de câmaras montadas na vertical (ex.: webcam de secretária
+// rodada 90° para captar a pessoa de corpo inteiro): sem isto, o MediaPipe recebe
+// o frame "deitado" tal como sai do sensor e não deteta a pessoa (o modelo está
+// treinado para corpos na vertical), mesmo que visualmente rodássemos só o CSS.
+// Ao rodar o pixel data antes da deteção, os landmarks já vêm calculados no
+// espaço correto e todo o resto do código (ângulos, segmentos, calibração,
+// gravação) funciona sem qualquer alteração adicional.
+const rotCanvas  = document.createElement('canvas');
+const rotCtx     = rotCanvas.getContext('2d');
 const angleValEl = document.getElementById('angle-val');
 const angleLblEl = document.getElementById('angle-lbl');
 const fpsLbl     = document.getElementById('fps-label');
@@ -658,7 +646,6 @@ const modeHint   = document.getElementById('mode-hint');
 const snapFlash  = document.getElementById('snap-flash');
 const statusMsg  = document.getElementById('status-msg');
 const medReadout = document.getElementById('med-readout');
-
 // ── Registo de paciente ──
 window.comecarSessao = function() {
   const nome = document.getElementById('reg-nome').value.trim();
@@ -671,7 +658,6 @@ window.comecarSessao = function() {
   document.getElementById('page-session').style.display = 'block';
   setup();
 };
-
 // ── Configuração MediaPipe ──
 async function setup() {
   try {
@@ -699,7 +685,6 @@ async function setup() {
     errorBox.classList.add('show');
   }
 }
-
 // ── Câmara ──
 async function startCamera() {
   if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
@@ -709,13 +694,13 @@ async function startCamera() {
   });
   video.srcObject = stream;
   isMirrored = (facingMode === 'user');
-  const m = isMirrored ? 'scaleX(-1)' : 'none';
-  video.style.transform  = m;
-  canvas.style.transform = m;
+  // O <video> em si já não é mostrado (ver #video{opacity:0} no CSS) — o
+  // espelho é aplicado diretamente nos pixels em compositeSourceFrame(),
+  // em conjunto com a rotação manual, para que as duas transformações
+  // fiquem sempre coerentes entre si e com o que o MediaPipe recebe.
   return new Promise(resolve => {
     video.onloadedmetadata = () => {
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
+      syncCanvasDims();
       // Reset calibração e medição ao trocar câmara
       calibPts      = [];
       scaleFactor   = null;
@@ -728,17 +713,43 @@ async function startCamera() {
     };
   });
 }
-
 window.flipCamera = async function() {
   facingMode = (facingMode === 'user') ? 'environment' : 'user';
   await startCamera();
 };
-
+// ── Rotação manual do frame (câmaras montadas na vertical) ──
+// Cicla 0° → 90° → 180° → 270° → 0°. Útil quando a câmara/webcam está
+// fisicamente rodada em relação ao ecrã (ex.: webcam de secretária virada
+// na vertical para captar a pessoa de corpo inteiro).
+window.rodarCamara = function() {
+  rotateDeg = (rotateDeg + 90) % 360;
+  syncCanvasDims();
+  document.getElementById('btn-rot').textContent = `🔄 Rodar (${rotateDeg}°)`;
+  statusMsg.textContent = `Rotação da imagem: ${rotateDeg}°`;
+};
+// Ajusta as dimensões do canvas principal e do canvas de rotação consoante
+// a resolução nativa do vídeo e a rotação escolhida (90°/270° trocam
+// largura por altura, tal como já acontecia naturalmente com vídeo em
+// retrato vindo de um telemóvel).
+function syncCanvasDims() {
+  if (!video.videoWidth || !video.videoHeight) return;
+  const swapped = (rotateDeg === 90 || rotateDeg === 270);
+  const w = swapped ? video.videoHeight : video.videoWidth;
+  const h = swapped ? video.videoWidth  : video.videoHeight;
+  canvas.width    = w;
+  canvas.height   = h;
+  rotCanvas.width  = w;
+  rotCanvas.height = h;
+}
 // ── Loop de deteção ──
 function predictLoop() {
   if (video.currentTime !== lastVideoTime && video.readyState >= 2) {
     lastVideoTime = video.currentTime;
-    const result = poseLandmarker.detectForVideo(video, performance.now());
+    compositeSourceFrame();
+    // Deteção sobre o canvas já rodado/espelhado — não sobre o <video> em bruto —
+    // para que o MediaPipe veja sempre a pessoa na vertical, independentemente
+    // de como a câmara está fisicamente montada.
+    const result = poseLandmarker.detectForVideo(rotCanvas, performance.now());
     draw(result);
   }
   frmCount++;
@@ -750,44 +761,54 @@ function predictLoop() {
   }
   requestAnimationFrame(predictLoop);
 }
-
+// Desenha o frame atual do <video> no rotCanvas, aplicando espelho (câmara
+// frontal) e rotação manual (rotateDeg). É a única função que sabe destes
+// dois ajustes — tudo o resto (deteção, desenho, calibração, gravação)
+// trabalha sobre o resultado já corrigido.
+function compositeSourceFrame() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) return;
+  rotCtx.save();
+  rotCtx.clearRect(0, 0, rotCanvas.width, rotCanvas.height);
+  rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+  rotCtx.rotate(rotateDeg * Math.PI / 180);
+  if (isMirrored) rotCtx.scale(-1, 1);
+  rotCtx.drawImage(video, -vw / 2, -vh / 2, vw, vh);
+  rotCtx.restore();
+}
 // ── Distância entre dois landmarks em pixels de canvas ──
 function segPx(a, b) {
   const dx = (a.x - b.x) * canvas.width;
   const dy = (a.y - b.y) * canvas.height;
   return Math.hypot(dx, dy);
 }
-
 function toCm(px) {
   if (!scaleFactor || px == null) return null;
   return (px * scaleFactor).toFixed(1);
 }
-
 // ── Desenho e cálculo ──
 function draw(result) {
   ctx.save();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+  // Frame da câmara já rodado/espelhado (compositeSourceFrame) — desenhado
+  // aqui em vez de deixar o <video> visível por baixo, para que o que se vê
+  // no ecrã e o que o MediaPipe usou para detetar sejam sempre a mesma imagem.
+  ctx.drawImage(rotCanvas, 0, 0);
   // Pontos de calibração e de medição manual (sempre visíveis)
   drawCalibPoints();
   drawMedPoints();
-
   if (!result.landmarks || result.landmarks.length === 0) {
     angleLblEl.textContent = 'sem deteção — ajusta o enquadramento';
     ctx.restore();
     return;
   }
-
   const lm = result.landmarks[0];
-
   // Esqueleto completo (tons suaves)
   drawingUtils.drawLandmarks(lm, { radius: 3, color: '#3ddc97', fillColor: '#3ddc97' });
   drawingUtils.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {
     color: 'rgba(61,220,151,0.35)', lineWidth: 2
   });
-
   const toPx = p => ({ x: p.x * canvas.width, y: p.y * canvas.height });
-
   // Destaque dos segmentos dos membros inferiores
   // Esquerdo (azul): 23=anca_E, 25=joelho_E, 27=tornozelo_E
   drawSegment(toPx(lm[23]), toPx(lm[25]), 'rgba(59,130,246,0.75)', 2.5);
@@ -795,7 +816,6 @@ function draw(result) {
   // Direito (vermelho): 24=anca_D, 26=joelho_D, 28=tornozelo_D
   drawSegment(toPx(lm[24]), toPx(lm[26]), 'rgba(239,68,68,0.75)', 2.5);
   drawSegment(toPx(lm[26]), toPx(lm[28]), 'rgba(239,68,68,0.75)', 2.5);
-
   // Pontos anatómicos: midpoint ombros, midpoint ancas, midpoint olhos (aprox. testa)
   // (entre os olhos = nasion aproximado; usado só para a linha visual, não para o cálculo do ângulo)
   const sh   = { x: (lm[11].x + lm[12].x) / 2, y: (lm[11].y + lm[12].y) / 2 };
@@ -803,7 +823,6 @@ function draw(result) {
   const head = { x: (lm[2].x  + lm[5].x)  / 2, y: (lm[2].y  + lm[5].y)  / 2 };
   const hipPx  = toPx(hip);
   const headPx = toPx(head);
-
   // Linha do tronco (amarela): anca → além da cabeça, sem marcadores nas extremidades.
   // Prolonga-se 35% para além do ponto entre os olhos para "passar" visualmente a cabeça.
   // É só referência visual — o ângulo clínico abaixo continua a usar anca→ombro,
@@ -814,7 +833,6 @@ function draw(result) {
     y: hipPx.y + (headPx.y - hipPx.y) * 1.35,
   };
   drawSegment(hipPx, lineEndPx, '#ffd23d', 3);
-
   // Linha pélvica de referência (vertical, fina, tracejada, vermelha)
   // — passa pelo midpoint das ancas (linha medial), do topo ao fundo do ecrã.
   // Cor vermelha (em vez de amarela) para não se confundir visualmente com o
@@ -828,7 +846,6 @@ function draw(result) {
   ctx.moveTo(hipPx.x, 0);
   ctx.lineTo(hipPx.x, canvas.height);
   ctx.stroke();
-
   // Linhas verticais de referência (finas, tracejadas, amarelas) — uma a passar
   // por cada anca (não seguem mais nenhum landmark, são retas puras, tal como a
   // linha medial acima — servem para ver se joelho/tornozelo/ombro
@@ -843,7 +860,6 @@ function draw(result) {
     ctx.stroke();
   });
   ctx.setLineDash([]);
-
   // Ângulo do tronco em relação à vertical (medida clínica: vetor anca → ombro)
   // Em coords de imagem (y para baixo), upward = (0, -1).
   // Só calcula/atualiza se ombros e ancas tiverem confiança suficiente —
@@ -854,15 +870,14 @@ function draw(result) {
     const ty = sh.y - hip.y;  // negativo (ombros acima das ancas)
     // Sinal preservado em tx: distingue para que lado o tronco se inclina
     // (positivo/negativo conforme a convenção da câmara — ver nota no label).
-    // NOTA: com câmara frontal (facingMode 'user') a imagem é espelhada via CSS só
-    // para exibição; isto não afeta lm[].x, mas o sinal aqui corresponde à imagem
-    // tal como a câmara a captou, não necessariamente à direita/esquerda anatómica
-    // do paciente — relevante só se mudares de câmara traseira para frontal.
+    // NOTA: o espelho (câmara frontal) e a rotação manual (rodarCamara) já são
+    // aplicados nos pixels em compositeSourceFrame(), antes da deteção — por
+    // isso lm[].x/y aqui já estão no referencial final mostrado no ecrã, e o
+    // sinal corresponde sempre ao que se vê, não ao sensor em bruto.
     const rawAngle = Math.atan2(tx, -ty) * (180 / Math.PI);
     anguloUltimo = smooth('angulo', rawAngle);
   }
   const angle = anguloUltimo;
-
   // Log contínuo do ângulo durante a avaliação — captura a oscilação
   // pendular esquerda/direita do tronco ao longo da marcha.
   // Amostragem limitada a ~6-7 Hz (passo de 0.15s): suficiente para a
@@ -877,7 +892,6 @@ function draw(result) {
       lastLogT = tNow;
     }
   }
-
   // Calcular distâncias segmentares — cada perna verificada de forma independente,
   // para que a oclusão de um dos lados não invalide a medida do outro.
   // Suavizadas com chave própria por métrica (em vez do único buffer antigo
@@ -894,7 +908,6 @@ function draw(result) {
     khD_px  = smooth('khD', segPx(lm[26], lm[24]));  // joelho D → anca D
     totD_px = akD_px + khD_px;
   }
-
   // UI — ângulo (com sinal: + e - indicam o lado da inclinação)
   const absAngle = Math.abs(angle);
   angleValEl.textContent = (angle > 0 ? '+' : '') + angle.toFixed(1);
@@ -907,7 +920,6 @@ function draw(result) {
     : scaleFactor
       ? `desvio do tronco da vertical  ·  + / - indica o lado`
       : `desvio do tronco da vertical  ·  calibra para medidas em cm`;
-
   // Guardar métricas correntes para snapshot
   currentM = {
     angulo_tronco: angle.toFixed(1),
@@ -918,11 +930,9 @@ function draw(result) {
     knee_hip_dir:  toCm(khD_px)  ?? '—',
     total_dir:     toCm(totD_px) ?? '—',
   };
-
   ctx.restore();
   compositarFrameGravacao();
 }
-
 function drawSegment(a, b, color, width) {
   ctx.lineWidth   = width;
   ctx.strokeStyle = color;
@@ -931,7 +941,6 @@ function drawSegment(a, b, color, width) {
   ctx.lineTo(b.x, b.y);
   ctx.stroke();
 }
-
 function drawCalibPoints() {
   calibPts.forEach((p, i) => {
     ctx.beginPath();
@@ -955,7 +964,6 @@ function drawCalibPoints() {
     ctx.setLineDash([]);
   }
 }
-
 function drawMedPoints() {
   medPts.forEach((p, i) => {
     ctx.beginPath();
@@ -979,7 +987,6 @@ function drawMedPoints() {
     ctx.setLineDash([]);
   }
 }
-
 // ── Calibração ──
 window.iniciarCalibracao = function() {
   if (medMode) cancelarMedicao();
@@ -993,7 +1000,6 @@ window.iniciarCalibracao = function() {
   document.getElementById('btn-calib').textContent = '✕ Cancelar calib.';
   document.getElementById('btn-calib').onclick = cancelarCalibracao;
 };
-
 function cancelarCalibracao() {
   calibMode = false;
   calibPts  = [];
@@ -1005,7 +1011,6 @@ function cancelarCalibracao() {
   btn.onclick = iniciarCalibracao;
 }
 window.iniciarCalibracao = iniciarCalibracao;
-
 function canvasPoint(e) {
   const rect = canvas.getBoundingClientRect();
   let cx, cy;
@@ -1016,22 +1021,21 @@ function canvasPoint(e) {
     cx = e.clientX;
     cy = e.clientY;
   }
-  // Converter posição CSS → pixels de canvas
+  // Converter posição CSS → pixels de canvas. O espelho e a rotação já estão
+  // "queimados" nos pixels do canvas (ver compositeSourceFrame), pelo que o
+  // toque/clique mapeia diretamente para o mesmo referencial da imagem
+  // mostrada, sem qualquer ajuste adicional aqui.
   const sx = canvas.width  / rect.width;
   const sy = canvas.height / rect.height;
   let x = (cx - rect.left) * sx;
   const y = (cy - rect.top) * sy;
-  // Se a câmara está espelhada via CSS, o clique está no espaço espelhado
-  // mas a distância de calibração é simétrica — não é necessário ajustar
   return { x, y };
 }
-
 function handleCalib(e) {
   if (!calibMode) return;
   e.preventDefault();
   const pt = canvasPoint(e);
   calibPts.push(pt);
-
   if (calibPts.length === 1) {
     modeHint.textContent = '📏 Agora toca no 2.º ponto (a 30 cm do primeiro)';
     statusMsg.textContent = 'Calibração — toca no 2.º ponto';
@@ -1056,15 +1060,12 @@ function handleCalib(e) {
     btn.onclick = iniciarCalibracao;
   }
 }
-
 canvas.addEventListener('click',      handleCanvasTap);
 canvas.addEventListener('touchstart', handleCanvasTap, { passive: false });
-
 function handleCanvasTap(e) {
   if (calibMode) { handleCalib(e); return; }
   if (medMode)   { handleMedicao(e); return; }
 }
-
 // ── Medição manual (rato/toque): 2 pontos → distância em cm ──
 window.iniciarMedicao = function() {
   if (calibMode) cancelarCalibracao();
@@ -1078,7 +1079,6 @@ window.iniciarMedicao = function() {
   btn.textContent = '✕ Cancelar medição';
   btn.onclick = cancelarMedicao;
 };
-
 function cancelarMedicao() {
   medMode = false;
   medPts  = [];
@@ -1089,13 +1089,11 @@ function cancelarMedicao() {
   btn.textContent = '📐 Medir';
   btn.onclick = iniciarMedicao;
 }
-
 function handleMedicao(e) {
   if (!medMode) return;
   e.preventDefault();
   const pt = canvasPoint(e);
   medPts.push(pt);
-
   if (medPts.length === 1) {
     modeHint.textContent = '📐 Agora toca no 2.º ponto';
     statusMsg.textContent = 'Medição — toca no 2.º ponto';
@@ -1108,7 +1106,6 @@ function handleMedicao(e) {
     const btn = document.getElementById('btn-medir');
     btn.textContent = '📐 Medir';
     btn.onclick = iniciarMedicao;
-
     if (!scaleFactor) {
       modeHint.textContent = '⚠ Calibra primeiro (📏) para obter medidas em cm';
       setTimeout(() => modeHint.classList.remove('show'), 2500);
@@ -1123,7 +1120,6 @@ function handleMedicao(e) {
     statusMsg.textContent = `Medição: ${lastMedDistCm} cm`;
   }
 }
-
 // ── Gravação de vídeo (vídeo + esqueleto/linhas compostos num canvas próprio) ──
 // NOTA DE COMPATIBILIDADE: nem todos os browsers conseguem gravar diretamente
 // em .mp4 via MediaRecorder (Safari sim; Chrome/Firefox tipicamente só .webm).
@@ -1142,7 +1138,6 @@ function escolherFormatoVideo() {
   }
   return null;
 }
-
 function iniciarGravacao() {
   recBlobUrl = null;
   if (!window.MediaRecorder || !canvas.captureStream) {
@@ -1156,14 +1151,12 @@ function iniciarGravacao() {
   }
   recMime = formato.mime;
   recExt  = formato.ext;
-
   recCanvas = document.createElement('canvas');
   recCanvas.width  = canvas.width;
   recCanvas.height = canvas.height;
   recCanvas.style.display = 'none';
   document.body.appendChild(recCanvas);
   recCtx = recCanvas.getContext('2d');
-
   try {
     const stream = recCanvas.captureStream(25);
     recChunks = [];
@@ -1176,7 +1169,6 @@ function iniciarGravacao() {
     gravando = false;
   }
 }
-
 function pararGravacao() {
   return new Promise(resolve => {
     if (!gravando || !mediaRecorder) { resolve(); return; }
@@ -1190,22 +1182,16 @@ function pararGravacao() {
     mediaRecorder.stop();
   });
 }
-
-// Composição do frame de gravação: vídeo real + esqueleto/linhas já desenhados
-// no canvas visível + leitura do ângulo "queimada" na imagem (para o vídeo
-// ser autocontido, sem depender dos painéis HTML que não são capturados).
+// Composição do frame de gravação: o canvas principal (`canvas`) já contém o
+// frame da câmara (rodado/espelhado) com o esqueleto/linhas desenhados por
+// cima — basta copiá-lo para o canvas de gravação. Antes desta correção,
+// esta função desenhava o <video> em bruto por baixo do overlay; com uma
+// câmara rodada isso desalinhava vídeo e esqueleto na gravação. Agora usam
+// sempre a mesma imagem-base.
 function compositarFrameGravacao() {
   if (!gravando || !recCtx) return;
-  recCtx.save();
-  if (isMirrored) {
-    recCtx.translate(recCanvas.width, 0);
-    recCtx.scale(-1, 1);
-  }
-  recCtx.drawImage(video, 0, 0, recCanvas.width, recCanvas.height);
   recCtx.drawImage(canvas, 0, 0, recCanvas.width, recCanvas.height);
-  recCtx.restore();
-
-  // Leitura do ângulo + timestamp, em overlay simples (não espelhado)
+  // Leitura do ângulo + timestamp, em overlay simples
   const txt = `${anguloUltimo > 0 ? '+' : ''}${anguloUltimo.toFixed(1)}°  ·  desvio do tronco`;
   recCtx.font = `bold ${Math.round(recCanvas.width * 0.045)}px monospace`;
   recCtx.textBaseline = 'bottom';
@@ -1214,7 +1200,6 @@ function compositarFrameGravacao() {
   recCtx.fillStyle = '#ffd23d';
   recCtx.fillText(txt, recCanvas.width * 0.03, recCanvas.height - recCanvas.width * 0.02);
 }
-
 window.descarregarVideo = function() {
   if (!recBlobUrl) return;
   const a = document.createElement('a');
@@ -1224,7 +1209,6 @@ window.descarregarVideo = function() {
   a.click();
   a.remove();
 };
-
 // ── Controlo da sessão ──
 window.iniciarAvaliacao = function() {
   sessaoAtiva   = true;
@@ -1239,7 +1223,6 @@ window.iniciarAvaliacao = function() {
   document.getElementById('align-guide').style.display = 'none';
   iniciarGravacao();
 };
-
 window.registarMedidas = function() {
   if (!sessaoAtiva) return;
   const ts = new Date().toLocaleTimeString('pt-PT', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
@@ -1247,7 +1230,6 @@ window.registarMedidas = function() {
   snapFlash.classList.add('show');
   setTimeout(() => snapFlash.classList.remove('show'), 1200);
 };
-
 window.terminarAvaliacao = async function() {
   sessaoAtiva = false;
   document.getElementById('btn-ini').disabled  = false;
@@ -1259,12 +1241,10 @@ window.terminarAvaliacao = async function() {
   statusMsg.textContent = '■ Avaliação terminada';
   mostrarResumo();
 };
-
 // ── Modal de resumo ──
 function mostrarResumo() {
   document.getElementById('sum-pac').textContent = `${pacNome} · ${pacData}`;
   document.getElementById('btn-video').style.display = recBlobUrl ? 'block' : 'none';
-
   const statsEl = document.getElementById('sum-angle-stats');
   const stats = calcStatsAngulo(angleLog);
   if (!stats) {
@@ -1277,12 +1257,10 @@ function mostrarResumo() {
       <div class="stat-card"><div class="stat-lbl">Máx. para o outro lado</div><div class="stat-val">${stats.min>=0?'+':''}${stats.min.toFixed(1)}°</div></div>
     `;
   }
-
   const tbody = document.getElementById('sum-body');
   tbody.innerHTML = '';
   const wrap  = document.getElementById('sum-table-wrap');
   const empty = document.getElementById('sum-empty-msg');
-
   if (snapshots.length === 0) {
     empty.style.display = 'flex';
     wrap.style.display  = 'none';
@@ -1307,11 +1285,9 @@ function mostrarResumo() {
   }
   document.getElementById('summary').classList.add('show');
 }
-
 window.fecharResumo = function() {
   document.getElementById('summary').classList.remove('show');
 };
-
 window.copiarResumo = async function() {
   if (snapshots.length === 0) return;
   const header = `GaitAnalysis — ${pacNome} · ${pacData}\n` +
@@ -1329,7 +1305,6 @@ window.copiarResumo = async function() {
     alert('Copia o texto manualmente:\n\n' + header + rows);
   }
 };
-
 // ── Estatísticas do desvio do tronco (oscilação esq/dir durante a marcha) ──
 // NOTA METODOLÓGICA: isto é uma descrição estatística do sinal angular ao longo
 // de toda a avaliação, não uma análise ciclo-a-ciclo (não há deteção de
@@ -1347,51 +1322,42 @@ function calcStatsAngulo(log) {
   const std = Math.sqrt(variance);
   return { max, min, mean, meanAbs, std, amplitude: max - min, n: vals.length };
 }
-
 // ── Gráfico do desvio do tronco ao longo do tempo (canvas → PNG para o PDF) ──
 function desenharGraficoAngulo(log) {
   const W = 760, H = 300, PAD_L = 46, PAD_R = 16, PAD_T = 18, PAD_B = 34;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d');
-
   g.fillStyle = '#0b1014';
   g.fillRect(0, 0, W, H);
-
   const vals  = log.map(p => p.a);
   const tMax  = Math.max(log[log.length - 1].t, 1);
   const aMax  = Math.max(8, Math.ceil(Math.max(...vals.map(Math.abs)) * 1.2));
   const x     = t => PAD_L + (t / tMax) * (W - PAD_L - PAD_R);
   const y     = a => H / 2 - (a / aMax) * ((H - PAD_T - PAD_B) / 2);
-
   // Zonas de referência (±5° verde claro, ±15° amarelo) — coerente com as cores do readout em direto
   g.fillStyle = 'rgba(61,220,151,0.08)';
   g.fillRect(PAD_L, y(5), W - PAD_L - PAD_R, y(-5) - y(5));
-
   // Linha zero
   g.strokeStyle = 'rgba(255,255,255,0.35)';
   g.setLineDash([4, 4]);
   g.beginPath(); g.moveTo(PAD_L, y(0)); g.lineTo(W - PAD_R, y(0)); g.stroke();
   g.setLineDash([]);
-
   // Eixos
   g.strokeStyle = 'rgba(255,255,255,0.5)';
   g.lineWidth = 1;
   g.beginPath();
   g.moveTo(PAD_L, PAD_T); g.lineTo(PAD_L, H - PAD_B); g.lineTo(W - PAD_R, H - PAD_B);
   g.stroke();
-
   // Labels eixo Y
   g.fillStyle = '#9fb0b8'; g.font = '11px monospace'; g.textAlign = 'right'; g.textBaseline = 'middle';
   [-aMax, -aMax / 2, 0, aMax / 2, aMax].forEach(v => g.fillText(v.toFixed(0) + '°', PAD_L - 6, y(v)));
-
   // Labels eixo X (tempo)
   g.textAlign = 'center'; g.textBaseline = 'top';
   for (let i = 0; i <= 4; i++) {
     const t = (tMax / 4) * i;
     g.fillText(t.toFixed(0) + 's', x(t), H - PAD_B + 6);
   }
-
   // Curva do ângulo
   g.strokeStyle = '#ffd23d';
   g.lineWidth = 2;
@@ -1401,10 +1367,8 @@ function desenharGraficoAngulo(log) {
     if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
   });
   g.stroke();
-
   return c.toDataURL('image/png');
 }
-
 // ── Geração do relatório PDF ──
 window.gerarPDF = function() {
   if (!angleLog.length) {
@@ -1415,7 +1379,6 @@ window.gerarPDF = function() {
   const doc   = new jsPDF({ unit: 'mm', format: 'a4' });
   const stats = calcStatsAngulo(angleLog);
   const dur   = angleLog[angleLog.length - 1].t;
-
   // Cabeçalho
   doc.setFillColor(11, 16, 20);
   doc.rect(0, 0, 210, 30, 'F');
@@ -1425,7 +1388,6 @@ window.gerarPDF = function() {
   doc.setTextColor(230, 238, 240);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
   doc.text('Relatório de Avaliação da Marcha  ·  Ortopedia Universal  ·  João Santos', 14, 23);
-
   // Dados do paciente
   doc.setTextColor(20, 20, 20);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
@@ -1434,7 +1396,6 @@ window.gerarPDF = function() {
   doc.text(`Paciente: ${pacNome || '—'}`, 14, 49);
   doc.text(`Data: ${pacData || '—'}`, 14, 55);
   doc.text(`Duração registada: ${dur.toFixed(1)} s   ·   ${stats.n} amostras (~${(stats.n/dur).toFixed(1)} Hz)`, 14, 61);
-
   // Resumo biomecânico
   doc.setDrawColor(220, 224, 226);
   doc.line(14, 67, 196, 67);
@@ -1450,13 +1411,11 @@ window.gerarPDF = function() {
     `Variabilidade (desvio-padrão):         ${stats.std.toFixed(1)}°`,
   ];
   linhas.forEach((l, i) => doc.text(l, 14, 84 + i * 6.2));
-
   // Gráfico
   doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
   doc.text('Evolução do desvio do tronco durante a avaliação', 14, 130);
   const imgData = desenharGraficoAngulo(angleLog);
   doc.addImage(imgData, 'PNG', 14, 134, 182, 72);
-
   // Tabela de medidas pontuais registadas (se existirem)
   let yPos = 216;
   if (snapshots.length) {
@@ -1475,7 +1434,6 @@ window.gerarPDF = function() {
     });
     yPos += 6;
   }
-
   // Nota metodológica
   doc.setFontSize(8); doc.setTextColor(120, 120, 120);
   doc.text(
@@ -1485,11 +1443,9 @@ window.gerarPDF = function() {
     'de eventos individuais da marcha (heel-strike/passo) nesta versão.',
     14, 280, { maxWidth: 182 }
   );
-
   const nomeFicheiro = `GaitAnalysis_${(pacNome || 'paciente').replace(/\s+/g, '_')}_${pacData || ''}.pdf`;
   doc.save(nomeFicheiro);
 };
-
 // Data de hoje como padrão
 document.getElementById('reg-data').value = new Date().toISOString().split('T')[0];
 </script>
